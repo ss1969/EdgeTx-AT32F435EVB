@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Root>
+    <WorkBenchVersion>
+        <Version>V1.2.02</Version>
+    </WorkBenchVersion>
+    <MCUInfo>
+        <MCUSerials>AT32F435</MCUSerials>
+        <MCUName>AT32F435ZMT7</MCUName>
+        <MCUPackage>LQFP144</MCUPackage>
+    </MCUInfo>
+    <ACC>
+        <Mode>
+            <ModeSub name="ACC_State" value="TRUE"/>
+        </Mode>
+    </ACC>
+    <CRM>
+        <Mode>
+            <ModeSub name="HEXT" value="HEXT-External-Oscillator"/>
+        </Mode>
+        <Parameters>
+            <ParametersSub name="HEXT" value="HEXT_CRYSTAL"/>
+        </Parameters>
+    </CRM>
+    <DEBUG>
+        <Mode>
+            <ModeSub name="Debug interface" value="SWD"/>
+            <ModeSub name="SWO" value="TRUE"/>
+        </Mode>
+    </DEBUG>
+    <EXINT>
+        <Mode>
+            <ModeSub name="EXINT0" value="TRUE"/>
+        </Mode>
+    </EXINT>
+    <QSPI1>
+        <Mode>
+            <ModeSub name="QSPI_State" value="TRUE"/>
+        </Mode>
+        <Parameters>
+            <ParametersSub name="ClkDivision" value="QSPI_CLK_DIV_4"/>
+            <ParametersSub name="ClockFrequency" value="72000000"/>
+            <ParametersSub name="PortSwitch" value="QSPI_PORT_CMD"/>
+        </Parameters>
+        <Interrupts>
+            <InterruptsSub name="Interrupt_CMDSTS" value="TRUE"/>
+        </Interrupts>
+    </QSPI1>
+    <QSPI2>
+        <Mode>
+            <ModeSub name="QSPI_State" value="TRUE"/>
+        </Mode>
+        <Parameters>
+            <ParametersSub name="ClkDivision" value="QSPI_CLK_DIV_4"/>
+            <ParametersSub name="ClockFrequency" value="72000000"/>
+            <ParametersSub name="SckMode" value="QSPI_SCK_MODE_3"/>
+            <ParametersSub name="XipCacheEnable" value="FALSE"/>
+        </Parameters>
+    </QSPI2>
+    <SPI1>
+        <Mode>
+            <ModeSub name="Mode" value="Full_Duplex_Master"/>
+        </Mode>
+        <Parameters>
+            <ParametersSub name="TransmissionMode" value="SPI_TRANSMIT_FULL_DUPLEX"/>
+            <ParametersSub name="Mode" value="SPI_MODE_MASTER"/>
+            <ParametersSub name="FirstBit" value="SPI_FIRST_BIT_MSB"/>
+            <ParametersSub name="ClockFrequency" value="36000000"/>
+        </Parameters>
+    </SPI1>
+    <SYSTEM>
+        <Mode>
+            <ModeSub name="Time_Base" value="SysTick"/>
+        </Mode>
+    </SYSTEM>
+    <USART1>
+        <Mode>
+            <ModeSub name="Mode" value="Asynchronous"/>
+        </Mode>
+        <Parameters>
+            <ParametersSub name="RealBaudRate" value="115200"/>
+        </Parameters>
+    </USART1>
+    <USART2>
+        <Mode>
+            <ModeSub name="Mode" value="Asynchronous"/>
+        </Mode>
+        <Parameters>
+            <ParametersSub name="RealBaudRate" value="115200"/>
+        </Parameters>
+    </USART2>
+    <USART3>
+        <Mode>
+            <ModeSub name="Mode" value="Asynchronous"/>
+        </Mode>
+        <Parameters>
+            <ParametersSub name="RealBaudRate" value="115200"/>
+        </Parameters>
+    </USART3>
+    <USB_OTGFS1>
+        <Mode>
+            <ModeSub name="Mode" value="Device_Only"/>
+            <ModeSub name="Activate_VBUS" value="TRUE"/>
+        </Mode>
+    </USB_OTGFS1>
+    <NVIC>
+        <SysTick_Handler>1;15;0;0;0</SysTick_Handler>
+        <FLASH_IRQHandler>0;0;0;0;0</FLASH_IRQHandler>
+        <CRM_IRQHandler>0;0;0;0;0</CRM_IRQHandler>
+        <EXINT0_IRQHandler>0;0;0;0;0</EXINT0_IRQHandler>
+        <SPI1_IRQHandler>0;0;0;0;0</SPI1_IRQHandler>
+        <USART1_IRQHandler>0;0;0;0;0</USART1_IRQHandler>
+        <USART2_IRQHandler>0;0;0;0;0</USART2_IRQHandler>
+        <USART3_IRQHandler>0;0;0;0;0</USART3_IRQHandler>
+        <OTGFS1_WKUP_IRQHandler>0;0;0;0;0</OTGFS1_WKUP_IRQHandler>
+        <OTGFS1_IRQHandler>0;0;0;0;0</OTGFS1_IRQHandler>
+        <FPU_IRQHandler>0;0;0;0;0</FPU_IRQHandler>
+        <QSPI2_IRQHandler>0;0;0;0;0</QSPI2_IRQHandler>
+        <QSPI1_IRQHandler>1;0;0;0;0</QSPI1_IRQHandler>
+        <ACC_IRQHandler>0;0;0;0;0</ACC_IRQHandler>
+    </NVIC>
+    <GPIO>
+        <Signal SignalName="QSPI1_IO3" PinName="PF6">
+            <Parameters name="GPIO_PullType_Set" value="GPIO_PULL_UP"/>
+        </Signal>
+        <Signal SignalName="QSPI1_IO2" PinName="PF7">
+            <Parameters name="GPIO_PullType_Set" value="GPIO_PULL_UP"/>
+        </Signal>
+        <Signal SignalName="QSPI1_IO0" PinName="PF8">
+            <Parameters name="GPIO_PullType_Set" value="GPIO_PULL_UP"/>
+        </Signal>
+        <Signal SignalName="QSPI1_IO1" PinName="PF9">
+            <Parameters name="GPIO_PullType_Set" value="GPIO_PULL_UP"/>
+        </Signal>
+        <Signal SignalName="EXINT0" PinName="PA0">
+            <Parameters name="Label" value="BUTTON2"/>
+        </Signal>
+        <Signal SignalName="GPIO_Output" PinName="PD13">
+            <Parameters name="GPIO_Type" value="GPIO_OUTPUT_OPEN_DRAIN"/>
+            <Parameters name="Label" value="LED2"/>
+        </Signal>
+        <Signal SignalName="GPIO_Output" PinName="PD14">
+            <Parameters name="GPIO_Type" value="GPIO_OUTPUT_OPEN_DRAIN"/>
+            <Parameters name="Label" value="LED3"/>
+        </Signal>
+        <Signal SignalName="GPIO_Output" PinName="PD15">
+            <Parameters name="GPIO_Type" value="GPIO_OUTPUT_OPEN_DRAIN"/>
+            <Parameters name="Label" value="LED4"/>
+        </Signal>
+        <Signal SignalName="QSPI1_CS" PinName="PG6">
+            <Parameters name="GPIO_PullType_Set" value="GPIO_PULL_UP"/>
+        </Signal>
+    </GPIO>
+    <ClockConfiguration>
+        <rtcsel>0</rtcsel>
+        <rtcdiv>2</rtcdiv>
+        <hext>8.000000</hext>
+        <pllrcs>0</pllrcs>
+        <pllms>1</pllms>
+        <pllns>144</pllns>
+        <pllfr>4</pllfr>
+        <sclkselect>1</sclkselect>
+        <ahbdiv>1</ahbdiv>
+        <apb1div>2</apb1div>
+        <apb2div>2</apb2div>
+        <usbdiv>6.0</usbdiv>
+        <hicktousb>1</hicktousb>
+        <hicktosclk>0</hicktosclk>
+        <clkout1>0</clkout1>
+        <clkout1div1>1</clkout1div1>
+        <clkout1div2>1</clkout1div2>
+        <clkout2>0</clkout2>
+        <clkout2div1>1</clkout2div1>
+        <clkout2div2>1</clkout2div2>
+        <systicsel>8</systicsel>
+    </ClockConfiguration>
+    <PINInfo>
+        <PinSub pinname="PF6" signalname="QSPI1_IO3" signaltype="2"/>
+        <PinSub pinname="PF7" signalname="QSPI1_IO2" signaltype="2"/>
+        <PinSub pinname="PF8" signalname="QSPI1_IO0" signaltype="2"/>
+        <PinSub pinname="PF9" signalname="QSPI1_IO1" signaltype="2"/>
+        <PinSub pinname="PF10" signalname="QSPI1_SCK" signaltype="2"/>
+        <PinSub pinname="PH0/HEXT_IN" signalname="CRM_HEXT_IN" signaltype="2"/>
+        <PinSub pinname="PH1/HEXT_OUT" signalname="CRM_HEXT_OUT" signaltype="2"/>
+        <PinSub pinname="PC3" signalname="QSPI2_IO1" signaltype="2"/>
+        <PinSub pinname="PA0" signalname="EXINT0" signaltype="3"/>
+        <PinSub pinname="PA3" signalname="QSPI2_IO3" signaltype="2"/>
+        <PinSub pinname="PA5" signalname="QSPI2_IO2" signaltype="2"/>
+        <PinSub pinname="PA6" signalname="SPI1_MISO" signaltype="2"/>
+        <PinSub pinname="PA7" signalname="SPI1_MOSI" signaltype="2"/>
+        <PinSub pinname="PC4" signalname="USART3_TX" signaltype="2"/>
+        <PinSub pinname="PC5" signalname="USART3_RX" signaltype="2"/>
+        <PinSub pinname="PB0" signalname="QSPI2_IO0" signaltype="2"/>
+        <PinSub pinname="PB1" signalname="QSPI2_SCK" signaltype="2"/>
+        <PinSub pinname="PE13" signalname="SPI1_SCK" signaltype="2"/>
+        <PinSub pinname="PD13" signalname="GPIO_Output" signaltype="3"/>
+        <PinSub pinname="PD14" signalname="GPIO_Output" signaltype="3"/>
+        <PinSub pinname="PD15" signalname="GPIO_Output" signaltype="3"/>
+        <PinSub pinname="PG6" signalname="QSPI1_CS" signaltype="2"/>
+        <PinSub pinname="PG8" signalname="QSPI2_CS" signaltype="2"/>
+        <PinSub pinname="PC8" signalname="GPIO_Output" signaltype="3"/>
+        <PinSub pinname="PA9" signalname="USB_OTGFS1_VBUS" signaltype="2"/>
+        <PinSub pinname="PA10" signalname="USART1_RX" signaltype="2"/>
+        <PinSub pinname="PA11" signalname="USB_OTGFS1_D-" signaltype="2"/>
+        <PinSub pinname="PA12" signalname="USB_OTGFS1_D+" signaltype="2"/>
+        <PinSub pinname="PA13" signalname="DEBUG_JTMS_SWDIO" signaltype="2"/>
+        <PinSub pinname="PA14" signalname="DEBUG_JTCK_SWCLK" signaltype="2"/>
+        <PinSub pinname="PA15" signalname="USART1_TX" signaltype="2"/>
+        <PinSub pinname="PD5" signalname="USART2_TX" signaltype="2"/>
+        <PinSub pinname="PD6" signalname="USART2_RX" signaltype="2"/>
+        <PinSub pinname="PB3" signalname="DEBUG_SWO" signaltype="2"/>
+    </PINInfo>
+    <ProjectInfomation>
+        <ProjectName>AT32F435ZMT7EV</ProjectName>
+        <ProjectLocation>D:/Projects/EdgeTX</ProjectLocation>
+        <ToolchainIDE>MDK_V5</ToolchainIDE>
+        <ARMCompiler>0</ARMCompiler>
+        <KeepUserCode>true</KeepUserCode>
+        <NotUsedPinAnalog>false</NotUsedPinAnalog>
+        <CodeSplitIP>true</CodeSplitIP>
+        <AddNecessaryFileFlag>true</AddNecessaryFileFlag>
+        <MinHeapSize>0x200</MinHeapSize>
+        <MinStackSize>0x400</MinStackSize>
+        <UseFirmware>true</UseFirmware>
+        <PackageVersion>V2.2.3</PackageVersion>
+    </ProjectInfomation>
+</Root>

@@ -226,7 +226,7 @@
         <NotUsedPinAnalog>false</NotUsedPinAnalog>
         <CodeSplitIP>true</CodeSplitIP>
         <AddNecessaryFileFlag>true</AddNecessaryFileFlag>
-        <MinHeapSize>0x200</MinHeapSize>
+        <MinHeapSize>0x4000</MinHeapSize>
         <MinStackSize>0x400</MinStackSize>
         <UseFirmware>true</UseFirmware>
         <PackageVersion>V2.2.3</PackageVersion>

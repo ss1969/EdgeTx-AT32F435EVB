@@ -145,7 +145,7 @@ static int aps_qspi_xip_enable(confirm_state new_state, uint32_t timeout)
   * @note   Requires QSPI1 to be configured and wired to APS6404L.
   * @retval none.
   */
-void APS6404LHwReset(void)
+void PSRAM_Reset(void)
 {
   qspi_cmd_type cmd;
 
@@ -204,13 +204,14 @@ void APS6404LHwReset(void)
   * @param  nLength: number of ID bytes to read.
   * @retval 1 on success, 0 on failure.
   */
-int APS6404LHwReadId(unsigned char *pBuffer, int nLength)
+int PSRAM_ReadID(unsigned char *pBuffer, int nLength)
 {
   int i;
   qspi_cmd_type cmd;
   uint8_t value;
   volatile uint32_t delay;
   uint32_t total_len;
+  uint32_t wait;
 
   if(nLength <= 0)
   {
@@ -236,8 +237,8 @@ int APS6404LHwReadId(unsigned char *pBuffer, int nLength)
   cmd.data_counter = total_len;
   cmd.second_dummy_cycle_num = 0;
   cmd.operation_mode = QSPI_OPERATE_MODE_111;
-  cmd.read_status_config = QSPI_RSTSC_HW_AUTO;
-  cmd.read_status_enable = FALSE;
+  cmd.read_status_config = QSPI_RSTSC_SW_ONCE;
+  cmd.read_status_enable = TRUE;
   cmd.write_data_enable = FALSE;
 
   aps6404l_hw_stage = 11;
@@ -255,6 +256,14 @@ int APS6404LHwReadId(unsigned char *pBuffer, int nLength)
 
   for(i = 0; i < (int)total_len; i++)
   {
+    wait = 256;
+    while(qspi_flag_get(QSPI1, QSPI_RXFIFORDY_FLAG) == RESET)
+    {
+      if(wait-- == 0)
+      {
+        break;
+      }
+    }
     delay = 16;
     while(delay--)
     {
@@ -286,7 +295,7 @@ int APS6404LHwReadId(unsigned char *pBuffer, int nLength)
   * @param  nLength: number of bytes to write.
   * @retval 1 on success, 0 on failure.
   */
-int APS6404LHwWriteBytes(unsigned int address, const unsigned char *pBuffer, int nLength)
+int PSRAM_QPI_Write(unsigned int address, const unsigned char *pBuffer, int nLength)
 {
   int i;
   qspi_cmd_type cmd;
@@ -353,7 +362,7 @@ int APS6404LHwWriteBytes(unsigned int address, const unsigned char *pBuffer, int
   * @param  nLength: number of bytes to read.
   * @retval 1 on success, 0 on failure.
   */
-int APS6404LHwReadBytes(unsigned int address, unsigned char *pBuffer, int nLength)
+int PSRAM_QPI_Read(unsigned int address, unsigned char *pBuffer, int nLength)
 {
   int i;
   qspi_cmd_type cmd;
@@ -425,11 +434,136 @@ int APS6404LHwReadBytes(unsigned int address, unsigned char *pBuffer, int nLengt
   return 1;
 }
 
+int PSRAM_QPI_FastRead(unsigned int address, unsigned char *pBuffer, int nLength)
+{
+  int i;
+  qspi_cmd_type cmd;
+  volatile unsigned int delay;
+  unsigned int timeout;
+
+  if(nLength <= 0)
+  {
+    return 0;
+  }
+
+  aps6404l_hw_stage = 50;
+  if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
+  {
+    aps6404l_hw_stage = 0xEA;
+    return 0;
+  }
+
+  cmd.pe_mode_enable = FALSE;
+  cmd.pe_mode_operate_code = 0;
+  cmd.instruction_code = APS6404L_QUAD_READ;
+  cmd.instruction_length = QSPI_CMD_INSLEN_1_BYTE;
+  cmd.address_code = address;
+  cmd.address_length = QSPI_CMD_ADRLEN_3_BYTE;
+  cmd.data_counter = (uint32_t)nLength;
+  cmd.second_dummy_cycle_num = APS6404L_FAST_READ_DUMMY_CYCLES;
+  cmd.operation_mode = QSPI_OPERATE_MODE_444;
+  cmd.read_status_config = QSPI_RSTSC_HW_AUTO;
+  cmd.read_status_enable = FALSE;
+  cmd.write_data_enable = FALSE;
+
+  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
+  qspi_cmd_operation_kick(QSPI1, &cmd);
+
+  aps6404l_hw_stage = 52;
+  timeout = APS6404L_HW_TIMEOUT;
+  while(qspi_flag_get(QSPI1, QSPI_CMDSTS_FLAG) == RESET)
+  {
+    if(timeout-- == 0)
+    {
+      aps6404l_hw_stage = 0xE8;
+      aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+      return 0;
+    }
+  }
+
+  for(i = 0; i < nLength; i++)
+  {
+    delay = 16;
+    while(delay--)
+    {
+      __NOP();
+    }
+    pBuffer[i] = (unsigned char)qspi_byte_read(QSPI1);
+  }
+
+  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
+
+  if(!aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT))
+  {
+    aps6404l_hw_stage = 0xEA;
+    return 0;
+  }
+
+  aps6404l_hw_stage = 0;
+  return 1;
+}
+
+int PSRAM_QPI_FastWrite(unsigned int address, const unsigned char *pBuffer, int nLength)
+{
+  int i;
+  qspi_cmd_type cmd;
+
+  if(nLength <= 0)
+  {
+    return 0;
+  }
+
+  aps6404l_hw_stage = 60;
+  if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
+  {
+    aps6404l_hw_stage = 0xEA;
+    return 0;
+  }
+
+  cmd.pe_mode_enable = FALSE;
+  cmd.pe_mode_operate_code = 0;
+  cmd.instruction_code = APS6404L_QUAD_WRITE;
+  cmd.instruction_length = QSPI_CMD_INSLEN_1_BYTE;
+  cmd.address_code = address;
+  cmd.address_length = QSPI_CMD_ADRLEN_3_BYTE;
+  cmd.data_counter = (uint32_t)nLength;
+  cmd.second_dummy_cycle_num = 0;
+  cmd.operation_mode = QSPI_OPERATE_MODE_444;
+  cmd.read_status_config = QSPI_RSTSC_HW_AUTO;
+  cmd.read_status_enable = FALSE;
+  cmd.write_data_enable = TRUE;
+
+  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
+  qspi_cmd_operation_kick(QSPI1, &cmd);
+
+  for(i = 0; i < nLength; i++)
+  {
+    if(!qspi_wait_txfifo_ready(QSPI1, APS6404L_HW_TIMEOUT))
+    {
+      aps6404l_hw_stage = 0xE6;
+      aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+      return 0;
+    }
+    qspi_byte_write(QSPI1, (uint8_t)pBuffer[i]);
+  }
+
+  if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
+  {
+    aps6404l_hw_stage = 0xE7;
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+    return 0;
+  }
+
+  aps6404l_hw_stage = 0;
+  aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+  return 1;
+}
+
 /**
   * @brief  Enter QPI/quad mode (0x35).
   * @retval 1 on success, 0 on failure.
   */
-int APS6404LHwEnterQuadMode(void)
+int PSRAM_EnterQuadMode(void)
 {
   qspi_cmd_type cmd;
 
@@ -449,8 +583,8 @@ int APS6404LHwEnterQuadMode(void)
   cmd.data_counter = 0;
   cmd.second_dummy_cycle_num = 0;
   cmd.operation_mode = QSPI_OPERATE_MODE_111;
-  cmd.read_status_config = QSPI_RSTSC_HW_AUTO;
-  cmd.read_status_enable = FALSE;
+  cmd.read_status_config = QSPI_RSTSC_SW_ONCE;
+  cmd.read_status_enable = TRUE;
   cmd.write_data_enable = FALSE;
 
   qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
@@ -471,9 +605,10 @@ int APS6404LHwEnterQuadMode(void)
   * @brief  Exit QPI/quad mode (0xF5).
   * @retval 1 on success, 0 on failure.
   */
-int APS6404LHwExitQuadMode(void)
+int PSRAM_ExitQuadMode(void)
 {
   qspi_cmd_type cmd;
+  qspi_cmd_type cmd2;
 
   aps6404l_hw_stage = 41;
   if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
@@ -490,13 +625,24 @@ int APS6404LHwExitQuadMode(void)
   cmd.address_length = QSPI_CMD_ADRLEN_0_BYTE;
   cmd.data_counter = 0;
   cmd.second_dummy_cycle_num = 0;
-  cmd.operation_mode = QSPI_OPERATE_MODE_111;
-  cmd.read_status_config = QSPI_RSTSC_HW_AUTO;
-  cmd.read_status_enable = FALSE;
+  cmd.operation_mode = QSPI_OPERATE_MODE_444;
+  cmd.read_status_config = QSPI_RSTSC_SW_ONCE;
+  cmd.read_status_enable = TRUE;
   cmd.write_data_enable = FALSE;
 
   qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
   qspi_cmd_operation_kick(QSPI1, &cmd);
+  if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
+  {
+    aps6404l_hw_stage = 0xE9;
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+    return 0;
+  }
+
+  cmd2 = cmd;
+  cmd2.operation_mode = QSPI_OPERATE_MODE_111;
+  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
+  qspi_cmd_operation_kick(QSPI1, &cmd2);
   if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
   {
     aps6404l_hw_stage = 0xE9;
@@ -533,8 +679,8 @@ int APS6404LHwWrapBoundaryToggle(void)
   cmd.data_counter = 0;
   cmd.second_dummy_cycle_num = 0;
   cmd.operation_mode = QSPI_OPERATE_MODE_111;
-  cmd.read_status_config = QSPI_RSTSC_HW_AUTO;
-  cmd.read_status_enable = FALSE;
+  cmd.read_status_config = QSPI_RSTSC_SW_ONCE;
+  cmd.read_status_enable = TRUE;
   cmd.write_data_enable = FALSE;
 
   qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);

@@ -448,6 +448,11 @@
               <FileType>1</FileType>
               <FilePath>..\src\aps6404l.c</FilePath>
             </File>
+            <File>
+              <FileName>uart3_printf.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\uart3_printf.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

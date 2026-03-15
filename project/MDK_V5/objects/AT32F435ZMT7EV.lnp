@@ -12,6 +12,7 @@
 ".\objects\wk_gpio.o"
 ".\objects\wk_edma.o"
 ".\objects\aps6404l.o"
+".\objects\uart3_printf.o"
 ".\objects\at32f435_437_crm.o"
 ".\objects\at32f435_437_gpio.o"
 ".\objects\at32f435_437_usart.o"

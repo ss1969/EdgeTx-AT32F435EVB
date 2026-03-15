@@ -39,6 +39,8 @@
 /* private includes ----------------------------------------------------------*/
 /* add user code begin private includes */
 #include "aps6404l.h"
+#include "uart3_printf.h"
+#include <stdlib.h>
 /* add user code end private includes */
 
 /* private typedef -----------------------------------------------------------*/
@@ -48,10 +50,9 @@
 
 /* private define ------------------------------------------------------------*/
 /* add user code begin private define */
-#define APS6404L_TEST_MAX_SIZE            (8U * 1024U * 1024U)
-#define APS6404L_TEST_STEP                (64U * 1024U)
-#define APS6404L_TEST_BLOCK_SIZE          256U
-#define APS6404L_TEST_PROGRESS_STEP       (1024U * 1024U)
+#define APS6404L_TEST_TOTAL_BYTES         (1U * 1024U * 1024U)
+#define APS6404L_TEST_CHUNK_SIZE          (8U * 1024U)
+#define APS6404L_TEST_PROGRESS_STEP       (256U * 1024U)
 
 /* add user code end private define */
 
@@ -67,57 +68,11 @@
 
 /* private function prototypes --------------------------------------------*/
 /* add user code begin function prototypes */
-void UART3_SendString(char *str);
 
 /* add user code end function prototypes */
 
 /* private user code ---------------------------------------------------------*/
 /* add user code begin 0 */
-
-
-/**
-  * @brief  Send a string via UART3
-  * @param  str: pointer to the null-terminated string
-  * @retval none
-  */
-void UART3_SendString(char *str)
-{
-    while (*str)
-    {
-        /* Wait until transmit data buffer is empty */
-        while (usart_flag_get(USART3, USART_TDBE_FLAG) == RESET)
-        {
-        }
-
-        /* Send data */
-        usart_data_transmit(USART3, (uint16_t)(*str));
-        str++;
-    }
-
-    /* Wait until transmit complete */
-    while (usart_flag_get(USART3, USART_TDC_FLAG) == RESET)
-    {
-    }
-}
-
-
-static void UART3_SendHexByte(unsigned char value)
-{
-  char hex_buf[4];
-  hex_buf[0] = ' ';
-  hex_buf[1] = "0123456789ABCDEF"[value >> 4];
-  hex_buf[2] = "0123456789ABCDEF"[value & 0x0F];
-  hex_buf[3] = '\0';
-  UART3_SendString(hex_buf);
-}
-
-static void UART3_SendHexU32(uint32_t value)
-{
-  UART3_SendHexByte((unsigned char)(value >> 24));
-  UART3_SendHexByte((unsigned char)(value >> 16));
-  UART3_SendHexByte((unsigned char)(value >> 8));
-  UART3_SendHexByte((unsigned char)(value >> 0));
-}
 /* add user code end 0 */
 
 /**
@@ -150,9 +105,9 @@ int main(void)
   wk_edma_stream1_init();
   /* config edma stream transfer parameter */
   /* user need to modify define values EDMA_STREAMx_XXX_BASE_ADDR and EDMA_STREAMx_BUFFER_SIZE in at32xxx_wk_config.h */
-  wk_edma_stream_config(EDMA_STREAM1,
-                        (uint32_t)&QSPI1->dt,
-                        EDMA_STREAM1_MEMORY0_BASE_ADDR,
+  wk_edma_stream_config(EDMA_STREAM1, 
+                        (uint32_t)&QSPI1->dt, 
+                        EDMA_STREAM1_MEMORY0_BASE_ADDR, 
                         EDMA_STREAM1_BUFFER_SIZE);
   /* enable stream */
   edma_stream_enable(EDMA_STREAM1, TRUE);
@@ -188,8 +143,8 @@ int main(void)
   unsigned char id[8];
   int i;
 
-  UART3_SendString("\x1b[2J\x1b[H");
-  UART3_SendString("start up\r\n");
+  UART3_Printf("\x1b[2J\x1b[H");
+  UART3_Printf("start up\r\n");
 
   /* add user code end 2 */
 
@@ -201,17 +156,19 @@ int main(void)
     if(!ran)
     {
       int ok;
-      unsigned char write_buf[APS6404L_TEST_BLOCK_SIZE];
-      unsigned char read_buf[APS6404L_TEST_BLOCK_SIZE];
+      unsigned char *write_buf;
       volatile unsigned char *psram = (volatile unsigned char *)APS6404L_MEM_BASE;
       unsigned int addr;
       unsigned int fail_addr = 0;
-      unsigned int last_block;
+      unsigned int offset;
       unsigned char pass = 1;
       unsigned char fail_index = 0;
       unsigned char fail_exp = 0;
       unsigned char fail_got = 0;
       unsigned int seed;
+      unsigned int chunk_len;
+      unsigned char used_malloc = 0;
+      static unsigned char write_buf_fallback[APS6404L_TEST_CHUNK_SIZE];
 
       edma_stream_enable(EDMA_STREAM1, FALSE);
 
@@ -220,77 +177,174 @@ int main(void)
         id[i] = 0;
       }
 
-      APS6404LHwReset();
-      ok = APS6404LHwReadId(id, (int)sizeof(id));
+      PSRAM_Reset();
+      ok = PSRAM_ReadID(id, (int)sizeof(id));
 
-      UART3_SendString("APS RDID:");
+      UART3_Printf("APS RDID:");
       for(i = 0; i < (int)sizeof(id); i++)
       {
-        UART3_SendHexByte(id[i]);
+        UART3_PrintHexByte(id[i]);
       }
-      UART3_SendString("\r\n");
+      UART3_Printf("\r\n");
 
-      UART3_SendString("stage=");
-      UART3_SendHexU32(APS6404LHwGetLastStage());
-      UART3_SendString("\r\n");
+      UART3_Printf("stage=");
+      UART3_PrintHexU32(APS6404LHwGetLastStage());
+      UART3_Printf("\r\n");
+
+      if(ok)
+      {
+        unsigned char all_ff = 1;
+        for(i = 0; i < (int)sizeof(id); i++)
+        {
+          if(id[i] != 0xFF)
+          {
+            all_ff = 0;
+            break;
+          }
+        }
+        if(all_ff)
+        {
+          ok = 0;
+        }
+      }
 
       if(!ok)
       {
-        UART3_SendString("APS RDID: FAIL\r\n");
+        UART3_Printf("APS RDID: FAIL\r\n");
       }
 
-      UART3_SendString("APS RW BIG: START\r\n");
-
-      if(APS6404L_TEST_MAX_SIZE < (unsigned int)sizeof(write_buf))
       {
-        last_block = 0;
+        unsigned char qpi_w[32];
+        unsigned char qpi_r[32];
+        unsigned char qpi_pass = 1;
+        unsigned char qpi_fail_index = 0;
+
+        for(i = 0; i < (int)sizeof(qpi_w); i++)
+        {
+          qpi_w[i] = (unsigned char)(0xA0 + i);
+          qpi_r[i] = 0;
+        }
+
+        UART3_Printf("APS QPI FAST: START\r\n");
+        if(!PSRAM_EnterQuadMode())
+        {
+          UART3_Printf("APS QPI FAST: ENTER FAIL\r\n");
+          UART3_Printf("stage=");
+          UART3_PrintHexU32(APS6404LHwGetLastStage());
+          UART3_Printf("\r\n");
+        }
+        else
+        {
+          if(!PSRAM_QPI_FastWrite(0, qpi_w, (int)sizeof(qpi_w)))
+          {
+            UART3_Printf("APS QPI FAST: W FAIL\r\n");
+            UART3_Printf("stage=");
+            UART3_PrintHexU32(APS6404LHwGetLastStage());
+            UART3_Printf("\r\n");
+          }
+          else if(!PSRAM_QPI_FastRead(0, qpi_r, (int)sizeof(qpi_r)))
+          {
+            UART3_Printf("APS QPI FAST: R FAIL\r\n");
+            UART3_Printf("stage=");
+            UART3_PrintHexU32(APS6404LHwGetLastStage());
+            UART3_Printf("\r\n");
+          }
+          else
+          {
+            for(i = 0; i < (int)sizeof(qpi_w); i++)
+            {
+              if(qpi_w[i] != qpi_r[i])
+              {
+                qpi_pass = 0;
+                qpi_fail_index = (unsigned char)i;
+                break;
+              }
+            }
+
+            if(qpi_pass)
+            {
+              UART3_Printf("APS QPI FAST: OK\r\n");
+            }
+            else
+            {
+              UART3_Printf("APS QPI FAST: FAIL idx=");
+              UART3_PrintHexByte(qpi_fail_index);
+              UART3_Printf(" exp=");
+              UART3_PrintHexByte(qpi_w[qpi_fail_index]);
+              UART3_Printf(" got=");
+              UART3_PrintHexByte(qpi_r[qpi_fail_index]);
+              UART3_Printf("\r\n");
+            }
+          }
+
+          if(!PSRAM_ExitQuadMode())
+          {
+            UART3_Printf("APS QPI FAST: EXIT FAIL\r\n");
+            UART3_Printf("stage=");
+            UART3_PrintHexU32(APS6404LHwGetLastStage());
+            UART3_Printf("\r\n");
+          }
+        }
+      }
+
+      PSRAM_Reset();
+
+      UART3_Printf("APS RW 1MB: START\r\n");
+
+      write_buf = (unsigned char *)malloc(APS6404L_TEST_CHUNK_SIZE);
+      if(write_buf == 0)
+      {
+        write_buf = write_buf_fallback;
+        UART3_Printf("APS RW 1MB: MALLOC FAIL, USE STATIC\r\n");
       }
       else
       {
-        last_block = APS6404L_TEST_MAX_SIZE - (unsigned int)sizeof(write_buf);
+        used_malloc = 1;
       }
 
-      for(addr = 0; addr <= last_block; addr += APS6404L_TEST_STEP)
+      addr = 0;
+      for(offset = 0; offset < APS6404L_TEST_TOTAL_BYTES; offset += APS6404L_TEST_CHUNK_SIZE)
       {
-        if((addr % APS6404L_TEST_PROGRESS_STEP) == 0U)
+        if((offset % APS6404L_TEST_PROGRESS_STEP) == 0U)
         {
-          UART3_SendString("addr=");
-          UART3_SendHexU32(addr);
-          UART3_SendString("\r\n");
+          UART3_Printf("off=");
+          UART3_PrintHexU32(offset);
+          UART3_Printf("\r\n");
         }
 
-        seed = 0x6D2B79F5u ^ addr;
-        for(i = 0; i < (int)sizeof(write_buf); i++)
+        chunk_len = APS6404L_TEST_CHUNK_SIZE;
+        if((APS6404L_TEST_TOTAL_BYTES - offset) < chunk_len)
+        {
+          chunk_len = APS6404L_TEST_TOTAL_BYTES - offset;
+        }
+
+        seed = 0x6D2B79F5u ^ (addr + offset);
+        for(i = 0; i < (int)chunk_len; i++)
         {
           seed ^= seed << 13;
           seed ^= seed >> 17;
           seed ^= seed << 5;
           write_buf[i] = (unsigned char)(seed & 0xFFu);
-          read_buf[i] = 0;
         }
 
-        for(i = 0; i < (int)sizeof(write_buf); i++)
+        for(i = 0; i < (int)chunk_len; i++)
         {
-          psram[addr + (unsigned int)i] = write_buf[i];
+          psram[addr + offset + (unsigned int)i] = write_buf[i];
         }
 
         __DSB();
         __ISB();
 
-        for(i = 0; i < (int)sizeof(read_buf); i++)
+        for(i = 0; i < (int)chunk_len; i++)
         {
-          read_buf[i] = psram[addr + (unsigned int)i];
-        }
-
-        for(i = 0; i < (int)sizeof(write_buf); i++)
-        {
-          if(write_buf[i] != read_buf[i])
+          unsigned char got = psram[addr + offset + (unsigned int)i];
+          if(write_buf[i] != got)
           {
             pass = 0;
-            fail_addr = addr;
+            fail_addr = addr + offset;
             fail_index = (unsigned char)i;
             fail_exp = write_buf[i];
-            fail_got = read_buf[i];
+            fail_got = got;
             break;
           }
         }
@@ -301,29 +355,34 @@ int main(void)
         }
       }
 
+      if(used_malloc)
+      {
+        free(write_buf);
+      }
+
       if(pass)
       {
-        UART3_SendString("APS RW BIG: OK\r\n");
+        UART3_Printf("APS RW 1MB: OK\r\n");
       }
       else
       {
-        UART3_SendString("APS RW BIG: FAIL addr=");
-        UART3_SendHexU32(fail_addr);
-        UART3_SendString(" idx=");
-        UART3_SendHexByte(fail_index);
-        UART3_SendString(" exp=");
-        UART3_SendHexByte(fail_exp);
-        UART3_SendString(" got=");
-        UART3_SendHexByte(fail_got);
-        UART3_SendString(" read0-15:");
+        UART3_Printf("APS RW 1MB: FAIL addr=");
+        UART3_PrintHexU32(fail_addr);
+        UART3_Printf(" idx=");
+        UART3_PrintHexByte(fail_index);
+        UART3_Printf(" exp=");
+        UART3_PrintHexByte(fail_exp);
+        UART3_Printf(" got=");
+        UART3_PrintHexByte(fail_got);
+        UART3_Printf("\r\n");
         for(i = 0; i < 16; i++)
         {
-          UART3_SendHexByte(read_buf[i]);
+          UART3_PrintHexByte(psram[fail_addr + (unsigned int)i]);
         }
-        UART3_SendString("\r\n");
-        UART3_SendString("stage=");
-        UART3_SendHexU32(APS6404LHwGetLastStage());
-        UART3_SendString("\r\n");
+        UART3_Printf("\r\n");
+        UART3_Printf("stage=");
+        UART3_PrintHexU32(APS6404LHwGetLastStage());
+        UART3_Printf("\r\n");
       }
 
       ran = 1;

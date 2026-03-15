@@ -33,23 +33,23 @@ ARM Macro Assembler    Page 1
    21 00000400         ;   <o>  Heap Size (in Bytes) <0x0-0xFFFFFFFF:8>
    22 00000400         ; </h>
    23 00000400         
-   24 00000400 00000200 
+   24 00000400 00004000 
                        Heap_Size
-                               EQU              0x00000200
+                               EQU              0x00004000
    25 00000400         
    26 00000400                 AREA             HEAP, NOINIT, READWRITE, ALIGN=
 3
    27 00000000         __heap_base
    28 00000000         Heap_Mem
                                SPACE            Heap_Size
-   29 00000200         __heap_limit
-   30 00000200         
-   31 00000200                 PRESERVE8
-   32 00000200                 THUMB
-   33 00000200         
-   34 00000200         
-   35 00000200         ; Vector Table Mapped to Address 0 at Reset
-   36 00000200                 AREA             RESET, DATA, READONLY
+   29 00004000         __heap_limit
+   30 00004000         
+   31 00004000                 PRESERVE8
+   32 00004000                 THUMB
+   33 00004000         
+   34 00004000         
+   35 00004000         ; Vector Table Mapped to Address 0 at Reset
+   36 00004000                 AREA             RESET, DATA, READONLY
    37 00000000                 EXPORT           __Vectors
    38 00000000                 EXPORT           __Vectors_End
    39 00000000                 EXPORT           __Vectors_Size
@@ -733,7 +733,7 @@ ARM Macro Assembler    Page 12
               00000000 
               00000000 
               00000400 
-              00000200 
+              00004000 
               00000000 
 Command Line: --debug --xref --diag_suppress=9931,A1950W --cpu=Cortex-M4.fp.sp 
 --depend=.\objects\startup_at32f435_437.d -o.\objects\startup_at32f435_437.o -I
@@ -803,7 +803,7 @@ Symbol: __heap_base
    Uses
       None
 Comment: __heap_base unused
-__heap_limit 00000200
+__heap_limit 00004000
 
 Symbol: __heap_limit
    Definitions
@@ -1932,7 +1932,7 @@ Comment: __user_initial_stackheap used once
 ARM Macro Assembler    Page 1 Alphabetic symbol ordering
 Absolute symbols
 
-Heap_Size 00000200
+Heap_Size 00004000
 
 Symbol: Heap_Size
    Definitions

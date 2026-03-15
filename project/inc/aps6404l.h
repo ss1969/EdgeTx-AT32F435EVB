@@ -1,4 +1,3 @@
-/* add user code begin Header */
 /**
   **************************************************************************
   * @file     aps6404l.h
@@ -22,7 +21,6 @@
   *
   **************************************************************************
   */
-/* add user code end Header */
 
 /* define to prevent recursive inclusion -----------------------------------*/
 #ifndef __APS6404L_H
@@ -34,19 +32,6 @@ extern "C" {
 
 /* includes -----------------------------------------------------------------------*/
 #include <stdint.h>
-
-/* private includes -------------------------------------------------------------*/
-/* add user code begin private includes */
-
-/* add user code end private includes */
-
-/* exported types -------------------------------------------------------------*/
-/* add user code begin exported types */
-
-/* add user code end exported types */
-
-/* exported constants --------------------------------------------------------*/
-/* add user code begin exported constants */
 
 /* APS6404L commands */
 #define APS6404L_WRITE                    0x02
@@ -61,28 +46,21 @@ extern "C" {
 #define APS6404L_RESET_ENABLE             0x66
 #define APS6404L_RESET                    0x99
 
+#define APS6404L_FAST_READ_DUMMY_CYCLES   6
+
 #define APS6404L_MEM_BASE                 ((uint32_t)0x90000000)
 
-/* add user code end exported constants */
-
-/* exported macro ------------------------------------------------------------*/
-/* add user code begin exported macro */
-
-/* add user code end exported macro */
-
 /* exported functions ------------------------------------------------------- */
-  void APS6404LHwReset(void);
-  int APS6404LHwReadId(unsigned char *pBuffer, int nLength);
-  int APS6404LHwWriteBytes(unsigned int address, const unsigned char *pBuffer, int nLength);
-  int APS6404LHwReadBytes(unsigned int address, unsigned char *pBuffer, int nLength);
-  int APS6404LHwEnterQuadMode(void);
-  int APS6404LHwExitQuadMode(void);
+  void PSRAM_Reset(void);
+  int PSRAM_ReadID(unsigned char *pBuffer, int nLength);
+  int PSRAM_QPI_Write(unsigned int address, const unsigned char *pBuffer, int nLength);
+  int PSRAM_QPI_Read(unsigned int address, unsigned char *pBuffer, int nLength);
+  int PSRAM_QPI_FastRead(unsigned int address, unsigned char *pBuffer, int nLength);
+  int PSRAM_QPI_FastWrite(unsigned int address, const unsigned char *pBuffer, int nLength);
+  int PSRAM_EnterQuadMode(void);
+  int PSRAM_ExitQuadMode(void);
   int APS6404LHwWrapBoundaryToggle(void);
   uint32_t APS6404LHwGetLastStage(void);
-
-/* add user code begin exported functions */
-
-/* add user code end exported functions */
 
 #ifdef __cplusplus
 }

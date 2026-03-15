@@ -64,7 +64,7 @@ void wk_qspi1_init(void)
   gpio_init_struct.gpio_out_type = GPIO_OUTPUT_PUSH_PULL;
   gpio_init_struct.gpio_mode = GPIO_MODE_MUX;
   gpio_init_struct.gpio_pins = GPIO_PINS_6;
-  gpio_init_struct.gpio_pull = GPIO_PULL_UP;
+  gpio_init_struct.gpio_pull = GPIO_PULL_NONE;
   gpio_init(GPIOG, &gpio_init_struct);
 
   /* configure the IO0 pin */
@@ -73,7 +73,7 @@ void wk_qspi1_init(void)
   gpio_init_struct.gpio_out_type = GPIO_OUTPUT_PUSH_PULL;
   gpio_init_struct.gpio_mode = GPIO_MODE_MUX;
   gpio_init_struct.gpio_pins = GPIO_PINS_8;
-  gpio_init_struct.gpio_pull = GPIO_PULL_UP;
+  gpio_init_struct.gpio_pull = GPIO_PULL_NONE;
   gpio_init(GPIOF, &gpio_init_struct);
 
   /* configure the IO1 pin */
@@ -82,7 +82,7 @@ void wk_qspi1_init(void)
   gpio_init_struct.gpio_out_type = GPIO_OUTPUT_PUSH_PULL;
   gpio_init_struct.gpio_mode = GPIO_MODE_MUX;
   gpio_init_struct.gpio_pins = GPIO_PINS_9;
-  gpio_init_struct.gpio_pull = GPIO_PULL_UP;
+  gpio_init_struct.gpio_pull = GPIO_PULL_NONE;
   gpio_init(GPIOF, &gpio_init_struct);
 
   /* configure the IO2 pin */
@@ -91,7 +91,7 @@ void wk_qspi1_init(void)
   gpio_init_struct.gpio_out_type = GPIO_OUTPUT_PUSH_PULL;
   gpio_init_struct.gpio_mode = GPIO_MODE_MUX;
   gpio_init_struct.gpio_pins = GPIO_PINS_7;
-  gpio_init_struct.gpio_pull = GPIO_PULL_UP;
+  gpio_init_struct.gpio_pull = GPIO_PULL_NONE;
   gpio_init(GPIOF, &gpio_init_struct);
 
   /* configure the IO3 pin */
@@ -100,14 +100,14 @@ void wk_qspi1_init(void)
   gpio_init_struct.gpio_out_type = GPIO_OUTPUT_PUSH_PULL;
   gpio_init_struct.gpio_mode = GPIO_MODE_MUX;
   gpio_init_struct.gpio_pins = GPIO_PINS_6;
-  gpio_init_struct.gpio_pull = GPIO_PULL_UP;
+  gpio_init_struct.gpio_pull = GPIO_PULL_NONE;
   gpio_init(GPIOF, &gpio_init_struct);
 
  /* configure param */
   qspi_xip_enable(QSPI1, FALSE);
 
-  qspi_clk_division_set(QSPI1, QSPI_CLK_DIV_4);
-
+  qspi_clk_division_set(QSPI1, QSPI_CLK_DIV_8);
+  
   qspi_sck_mode_set(QSPI1, QSPI_SCK_MODE_0);
 
   qspi_busy_config(QSPI1, QSPI_BUSY_OFFSET_0);
@@ -118,8 +118,9 @@ void wk_qspi1_init(void)
 
   qspi_dma_tx_threshold_set(QSPI1, QSPI_DMA_FIFO_THOD_WORD08);
 
-  /* enable interrupt */
-  qspi_interrupt_enable(QSPI1, TRUE);
+  qspi_xip_cache_bypass_set(QSPI1, TRUE);
+
+  qspi_xip_enable(QSPI1, TRUE);
 
   /* add user code begin qspi1_init 2 */
 
@@ -159,7 +160,7 @@ void wk_qspi2_init(void)
   gpio_init_struct.gpio_out_type = GPIO_OUTPUT_PUSH_PULL;
   gpio_init_struct.gpio_mode = GPIO_MODE_MUX;
   gpio_init_struct.gpio_pins = GPIO_PINS_8;
-  gpio_init_struct.gpio_pull = GPIO_PULL_NONE;
+  gpio_init_struct.gpio_pull = GPIO_PULL_UP;
   gpio_init(GPIOG, &gpio_init_struct);
 
   /* configure the IO0 pin */
@@ -201,9 +202,9 @@ void wk_qspi2_init(void)
  /* configure param */
   qspi_xip_enable(QSPI2, FALSE);
 
-  qspi_clk_division_set(QSPI2, QSPI_CLK_DIV_4);
-
-  qspi_sck_mode_set(QSPI2, QSPI_SCK_MODE_3);
+  qspi_clk_division_set(QSPI2, QSPI_CLK_DIV_8);
+  
+  qspi_sck_mode_set(QSPI2, QSPI_SCK_MODE_0);
 
   qspi_busy_config(QSPI2, QSPI_BUSY_OFFSET_0);
 
@@ -212,8 +213,6 @@ void wk_qspi2_init(void)
   qspi_dma_rx_threshold_set(QSPI2, QSPI_DMA_FIFO_THOD_WORD08);
 
   qspi_dma_tx_threshold_set(QSPI2, QSPI_DMA_FIFO_THOD_WORD08);
-
-  qspi_xip_cache_bypass_set(QSPI2, TRUE);
 
   qspi_xip_enable(QSPI2, TRUE);
 

@@ -113,8 +113,8 @@ extern "C" {
 //#define DMA2_CHANNEL7_MEMORY_BASE_ADDR   0
 //#define DMA2_CHANNEL7_PERIPHERAL_BASE_ADDR   0
  
-//#define EDMA_STREAM1_BUFFER_SIZE   0
-//#define EDMA_STREAM1_MEMORY0_BASE_ADDR   0
+#define EDMA_STREAM1_BUFFER_SIZE   0
+#define EDMA_STREAM1_MEMORY0_BASE_ADDR   0
 //#define EDMA_STREAM1_PERIPHERAL_BASE_ADDR   0
 //#define EDMA_STREAM1_MEMORY1_BASE_ADDR   0
 //#define EDMA_STREAM1_LINK_LIST_POINTER   0
@@ -165,6 +165,10 @@ extern "C" {
 /* Private defines -------------------------------------------------------------*/
 #define BUTTON2_PIN    GPIO_PINS_0
 #define BUTTON2_GPIO_PORT    GPIOA
+#define QSPI2_TE_PIN    GPIO_PINS_11
+#define QSPI2_TE_GPIO_PORT    GPIOF
+#define QSPI2_RESET_PIN    GPIO_PINS_12
+#define QSPI2_RESET_GPIO_PORT    GPIOF
 #define LED2_PIN    GPIO_PINS_13
 #define LED2_GPIO_PORT    GPIOD
 #define LED3_PIN    GPIO_PINS_14

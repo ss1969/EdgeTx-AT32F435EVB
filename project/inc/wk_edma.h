@@ -1,8 +1,8 @@
 /* add user code begin Header */
 /**
   **************************************************************************
-  * @file     at32f435_437_int.h
-  * @brief    header file of main interrupt service routines.
+  * @file     wk_edma.h
+  * @brief    header file of work bench config
   **************************************************************************
   * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
@@ -24,23 +24,23 @@
   */
 /* add user code end Header */
 
-/* define to prevent recursive inclusion -------------------------------------*/
-#ifndef __AT32F435_437_INT_H
-#define __AT32F435_437_INT_H
+/* define to prevent recursive inclusion -----------------------------------*/
+#ifndef __WK_EDMA_H
+#define __WK_EDMA_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* includes ------------------------------------------------------------------*/
-#include "at32f435_437.h"
+/* includes -----------------------------------------------------------------------*/
+#include "at32f435_437_wk_config.h"
 
-/* private includes ----------------------------------------------------------*/
+/* private includes -------------------------------------------------------------*/
 /* add user code begin private includes */
 
 /* add user code end private includes */
 
-/* exported types ------------------------------------------------------------*/
+/* exported types -------------------------------------------------------------*/
 /* add user code begin exported types */
 
 /* add user code end exported types */
@@ -56,17 +56,13 @@ extern "C" {
 /* add user code end exported macro */
 
 /* exported functions ------------------------------------------------------- */
-void NMI_Handler(void);
-void HardFault_Handler(void);
-void MemManage_Handler(void);
-void BusFault_Handler(void);
-void UsageFault_Handler(void);
-void SVC_Handler(void);
-void DebugMon_Handler(void);
-void PendSV_Handler(void);
 
-void SysTick_Handler(void);
+  /* init edma stream1 */
+  void wk_edma_stream1_init(void);
 
+  /* config dma stream transfer parameter */
+  /* user need to modify parameters memory0_base_addr and buffer_size */
+  void wk_edma_stream_config(edma_stream_type* edma_streamx, uint32_t peripheral_base_addr, uint32_t memory0_base_addr, uint16_t buffer_size);
 
 /* add user code begin exported functions */
 

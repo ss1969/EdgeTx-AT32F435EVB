@@ -438,6 +438,16 @@
               <FileType>1</FileType>
               <FilePath>..\src\wk_gpio.c</FilePath>
             </File>
+            <File>
+              <FileName>wk_edma.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\wk_edma.c</FilePath>
+            </File>
+            <File>
+              <FileName>aps6404l.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\aps6404l.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -467,6 +477,11 @@
               <FileName>at32f435_437_spi.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\libraries\drivers\src\at32f435_437_spi.c</FilePath>
+            </File>
+            <File>
+              <FileName>at32f435_437_edma.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\drivers\src\at32f435_437_edma.c</FilePath>
             </File>
             <File>
               <FileName>at32f435_437_debug.c</FileName>

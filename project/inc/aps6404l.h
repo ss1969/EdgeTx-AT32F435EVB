@@ -1,8 +1,8 @@
 /* add user code begin Header */
 /**
   **************************************************************************
-  * @file     at32f435_437_int.h
-  * @brief    header file of main interrupt service routines.
+  * @file     aps6404l.h
+  * @brief    APS6404L QSPI RAM driver header file
   **************************************************************************
   * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
@@ -24,29 +24,44 @@
   */
 /* add user code end Header */
 
-/* define to prevent recursive inclusion -------------------------------------*/
-#ifndef __AT32F435_437_INT_H
-#define __AT32F435_437_INT_H
+/* define to prevent recursive inclusion -----------------------------------*/
+#ifndef __APS6404L_H
+#define __APS6404L_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* includes ------------------------------------------------------------------*/
-#include "at32f435_437.h"
+/* includes -----------------------------------------------------------------------*/
+#include <stdint.h>
 
-/* private includes ----------------------------------------------------------*/
+/* private includes -------------------------------------------------------------*/
 /* add user code begin private includes */
 
 /* add user code end private includes */
 
-/* exported types ------------------------------------------------------------*/
+/* exported types -------------------------------------------------------------*/
 /* add user code begin exported types */
 
 /* add user code end exported types */
 
 /* exported constants --------------------------------------------------------*/
 /* add user code begin exported constants */
+
+/* APS6404L commands */
+#define APS6404L_WRITE                    0x02
+#define APS6404L_READ                     0x03
+#define APS6404L_FAST_READ                0x0B
+#define APS6404L_QUAD_READ                0xEB
+#define APS6404L_QUAD_WRITE               0x38
+#define APS6404L_ENTER_QUAD_MODE          0x35
+#define APS6404L_EXIT_QUAD_MODE           0xF5
+#define APS6404L_WRAP_BOUNDARY_TOGGLE     0xC0
+#define APS6404L_READ_ID                  0x9F
+#define APS6404L_RESET_ENABLE             0x66
+#define APS6404L_RESET                    0x99
+
+#define APS6404L_MEM_BASE                 ((uint32_t)0x90000000)
 
 /* add user code end exported constants */
 
@@ -56,17 +71,14 @@ extern "C" {
 /* add user code end exported macro */
 
 /* exported functions ------------------------------------------------------- */
-void NMI_Handler(void);
-void HardFault_Handler(void);
-void MemManage_Handler(void);
-void BusFault_Handler(void);
-void UsageFault_Handler(void);
-void SVC_Handler(void);
-void DebugMon_Handler(void);
-void PendSV_Handler(void);
-
-void SysTick_Handler(void);
-
+  void APS6404LHwReset(void);
+  int APS6404LHwReadId(unsigned char *pBuffer, int nLength);
+  int APS6404LHwWriteBytes(unsigned int address, const unsigned char *pBuffer, int nLength);
+  int APS6404LHwReadBytes(unsigned int address, unsigned char *pBuffer, int nLength);
+  int APS6404LHwEnterQuadMode(void);
+  int APS6404LHwExitQuadMode(void);
+  int APS6404LHwWrapBoundaryToggle(void);
+  uint32_t APS6404LHwGetLastStage(void);
 
 /* add user code begin exported functions */
 

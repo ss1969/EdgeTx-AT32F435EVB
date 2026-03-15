@@ -219,30 +219,6 @@ void SysTick_Handler(void)
   /* add user code end SysTick_IRQ 1 */
 }
 
-/**
-  * @brief  this function handles QSPI1 handler.
-  * @param  none
-  * @retval none
-  */
-void QSPI1_IRQHandler(void)
-{
-  /* add user code begin QSPI1_IRQ 0 */
-
-  /* add user code end QSPI1_IRQ 0 */
-
-  if(qspi_interrupt_flag_get(QSPI1, QSPI_CMDSTS_FLAG) != RESET)
-  {
-    /* add user code begin QSPI1_CMDSTS_FLAG */
-    /* clear flag */
-    qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
-    /* add user code end QSPI1_CMDSTS_FLAG */ 
-  }
-
-  /* add user code begin QSPI1_IRQ 1 */
-
-  /* add user code end QSPI1_IRQ 1 */
-}
-
 /* add user code begin 1 */
 
 /* add user code end 1 */

@@ -37,23 +37,16 @@
             <ModeSub name="QSPI_State" value="TRUE"/>
         </Mode>
         <Parameters>
-            <ParametersSub name="ClkDivision" value="QSPI_CLK_DIV_4"/>
-            <ParametersSub name="ClockFrequency" value="72000000"/>
-            <ParametersSub name="PortSwitch" value="QSPI_PORT_CMD"/>
+            <ParametersSub name="ClockFrequency" value="36000000"/>
+            <ParametersSub name="XipCacheEnable" value="FALSE"/>
         </Parameters>
-        <Interrupts>
-            <InterruptsSub name="Interrupt_CMDSTS" value="TRUE"/>
-        </Interrupts>
     </QSPI1>
     <QSPI2>
         <Mode>
             <ModeSub name="QSPI_State" value="TRUE"/>
         </Mode>
         <Parameters>
-            <ParametersSub name="ClkDivision" value="QSPI_CLK_DIV_4"/>
-            <ParametersSub name="ClockFrequency" value="72000000"/>
-            <ParametersSub name="SckMode" value="QSPI_SCK_MODE_3"/>
-            <ParametersSub name="XipCacheEnable" value="FALSE"/>
+            <ParametersSub name="ClockFrequency" value="36000000"/>
         </Parameters>
     </QSPI2>
     <SPI1>
@@ -102,11 +95,26 @@
             <ModeSub name="Activate_VBUS" value="TRUE"/>
         </Mode>
     </USB_OTGFS1>
+    <EDMA>
+        <QSPI1>
+            <ParametersSub name="Instance" value="EDMA_Stream1"/>
+            <ParametersSub name="Direction" value="EDMA_DIR_MEMORY_TO_PERIPHERAL"/>
+            <ParametersSub name="FIFOMode" value="TRUE"/>
+            <ParametersSub name="FIFOThreshold" value="EDMA_FIFO_THRESHOLD_HALF"/>
+            <ParametersSub name="SourceStride" value="0"/>
+            <ParametersSub name="DestinationStride" value="0"/>
+            <ParametersSub name="XAxisCount" value="0"/>
+            <ParametersSub name="YAxisCount" value="0"/>
+            <ParametersSub name="SyncRequestCount" value="1"/>
+            <ParametersSub name="RequestCount" value="1"/>
+        </QSPI1>
+    </EDMA>
     <NVIC>
         <SysTick_Handler>1;15;0;0;0</SysTick_Handler>
         <FLASH_IRQHandler>0;0;0;0;0</FLASH_IRQHandler>
         <CRM_IRQHandler>0;0;0;0;0</CRM_IRQHandler>
         <EXINT0_IRQHandler>0;0;0;0;0</EXINT0_IRQHandler>
+        <EDMA_Stream1_IRQHandler>0;0;0;0;0</EDMA_Stream1_IRQHandler>
         <SPI1_IRQHandler>0;0;0;0;0</SPI1_IRQHandler>
         <USART1_IRQHandler>0;0;0;0;0</USART1_IRQHandler>
         <USART2_IRQHandler>0;0;0;0;0</USART2_IRQHandler>
@@ -115,24 +123,22 @@
         <OTGFS1_IRQHandler>0;0;0;0;0</OTGFS1_IRQHandler>
         <FPU_IRQHandler>0;0;0;0;0</FPU_IRQHandler>
         <QSPI2_IRQHandler>0;0;0;0;0</QSPI2_IRQHandler>
-        <QSPI1_IRQHandler>1;0;0;0;0</QSPI1_IRQHandler>
+        <QSPI1_IRQHandler>0;0;0;0;0</QSPI1_IRQHandler>
+        <DMAMUX_IRQHandler>0;0;0;0;0</DMAMUX_IRQHandler>
         <ACC_IRQHandler>0;0;0;0;0</ACC_IRQHandler>
     </NVIC>
     <GPIO>
-        <Signal SignalName="QSPI1_IO3" PinName="PF6">
-            <Parameters name="GPIO_PullType_Set" value="GPIO_PULL_UP"/>
-        </Signal>
-        <Signal SignalName="QSPI1_IO2" PinName="PF7">
-            <Parameters name="GPIO_PullType_Set" value="GPIO_PULL_UP"/>
-        </Signal>
-        <Signal SignalName="QSPI1_IO0" PinName="PF8">
-            <Parameters name="GPIO_PullType_Set" value="GPIO_PULL_UP"/>
-        </Signal>
-        <Signal SignalName="QSPI1_IO1" PinName="PF9">
-            <Parameters name="GPIO_PullType_Set" value="GPIO_PULL_UP"/>
-        </Signal>
         <Signal SignalName="EXINT0" PinName="PA0">
             <Parameters name="Label" value="BUTTON2"/>
+        </Signal>
+        <Signal SignalName="GPIO_Input" PinName="PF11">
+            <Parameters name="GPIO_PullType_Set" value="GPIO_PULL_UP"/>
+            <Parameters name="Label" value="QSPI2_TE"/>
+        </Signal>
+        <Signal SignalName="GPIO_Output" PinName="PF12">
+            <Parameters name="GPIO_Outputlevel" value="GPIO_OUTPUTLEVEL_HIGH"/>
+            <Parameters name="GPIO_PullType_Set" value="GPIO_PULL_UP"/>
+            <Parameters name="Label" value="QSPI2_RESET"/>
         </Signal>
         <Signal SignalName="GPIO_Output" PinName="PD13">
             <Parameters name="GPIO_Type" value="GPIO_OUTPUT_OPEN_DRAIN"/>
@@ -146,7 +152,7 @@
             <Parameters name="GPIO_Type" value="GPIO_OUTPUT_OPEN_DRAIN"/>
             <Parameters name="Label" value="LED4"/>
         </Signal>
-        <Signal SignalName="QSPI1_CS" PinName="PG6">
+        <Signal SignalName="QSPI2_CS" PinName="PG8">
             <Parameters name="GPIO_PullType_Set" value="GPIO_PULL_UP"/>
         </Signal>
     </GPIO>
@@ -191,6 +197,8 @@
         <PinSub pinname="PC5" signalname="USART3_RX" signaltype="2"/>
         <PinSub pinname="PB0" signalname="QSPI2_IO0" signaltype="2"/>
         <PinSub pinname="PB1" signalname="QSPI2_SCK" signaltype="2"/>
+        <PinSub pinname="PF11" signalname="GPIO_Input" signaltype="3"/>
+        <PinSub pinname="PF12" signalname="GPIO_Output" signaltype="3"/>
         <PinSub pinname="PE13" signalname="SPI1_SCK" signaltype="2"/>
         <PinSub pinname="PD13" signalname="GPIO_Output" signaltype="3"/>
         <PinSub pinname="PD14" signalname="GPIO_Output" signaltype="3"/>

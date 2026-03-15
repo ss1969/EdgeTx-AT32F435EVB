@@ -57,10 +57,11 @@ extern "C" {
   int PSRAM_QPI_Read(unsigned int address, unsigned char *pBuffer, int nLength);
   int PSRAM_QPI_FastRead(unsigned int address, unsigned char *pBuffer, int nLength);
   int PSRAM_QPI_FastWrite(unsigned int address, const unsigned char *pBuffer, int nLength);
+  int PSRAM_EDMA_Write(unsigned int address, const unsigned char *pBuffer, int nLength);
+  int PSRAM_EDMA_Read(unsigned int address, unsigned char *pBuffer, int nLength);
   int PSRAM_EnterQuadMode(void);
   int PSRAM_ExitQuadMode(void);
-  int APS6404LHwWrapBoundaryToggle(void);
-  uint32_t APS6404LHwGetLastStage(void);
+  int PSRAM_ToggleWrapBoundary(void);
 
 #ifdef __cplusplus
 }

@@ -1,19 +1,10 @@
 #include "aps6404l.h"
+#include "at32f435_437_edma.h"
 #include "at32f435_437_qspi.h"
 
 #define APS6404L_HW_TIMEOUT 2000000U
 
-static volatile uint32_t aps6404l_hw_stage = 0;
-
-/**
-  * @brief  Get last stage/error code for APS6404L hardware driver.
-  * @note   Value is 0 on success. Non-zero values indicate the last failure point.
-  * @retval Stage/error code.
-  */
-uint32_t APS6404LHwGetLastStage(void)
-{
-  return aps6404l_hw_stage;
-}
+static uint8_t aps6404l_edma_inited = 0;
 
 /**
   * @brief  Wait for command completion flag without clearing it.
@@ -140,6 +131,92 @@ static int aps_qspi_xip_enable(confirm_state new_state, uint32_t timeout)
   return 1;
 }
 
+static void aps_edma_clear_stream1_flags(void)
+{
+  edma_flag_clear(EDMA_FERR1_FLAG);
+  edma_flag_clear(EDMA_DMERR1_FLAG);
+  edma_flag_clear(EDMA_DTERR1_FLAG);
+  edma_flag_clear(EDMA_HDT1_FLAG);
+  edma_flag_clear(EDMA_FDT1_FLAG);
+}
+
+static void aps_edma_clear_stream2_flags(void)
+{
+  edma_flag_clear(EDMA_FERR2_FLAG);
+  edma_flag_clear(EDMA_DMERR2_FLAG);
+  edma_flag_clear(EDMA_DTERR2_FLAG);
+  edma_flag_clear(EDMA_HDT2_FLAG);
+  edma_flag_clear(EDMA_FDT2_FLAG);
+}
+
+static void aps_edma_init_once(void)
+{
+  edma_init_type edma_init_struct;
+
+  if(aps6404l_edma_inited)
+  {
+    return;
+  }
+
+  edmamux_enable(TRUE);
+  edmamux_init(EDMAMUX_CHANNEL1, EDMAMUX_DMAREQ_ID_QSPI1);
+  edmamux_init(EDMAMUX_CHANNEL2, EDMAMUX_DMAREQ_ID_QSPI1);
+
+  edma_reset(EDMA_STREAM1);
+  edma_reset(EDMA_STREAM2);
+
+  edma_default_para_init(&edma_init_struct);
+  edma_init_struct.peripheral_data_width = EDMA_PERIPHERAL_DATA_WIDTH_WORD;
+  edma_init_struct.peripheral_inc_enable = FALSE;
+  edma_init_struct.memory_data_width = EDMA_MEMORY_DATA_WIDTH_WORD;
+  edma_init_struct.memory_inc_enable = TRUE;
+  edma_init_struct.fifo_mode_enable = TRUE;
+  edma_init_struct.fifo_threshold = EDMA_FIFO_THRESHOLD_HALF;
+  edma_init_struct.peripheral_burst_mode = EDMA_PERIPHERAL_SINGLE;
+  edma_init_struct.memory_burst_mode = EDMA_MEMORY_SINGLE;
+  edma_init_struct.priority = EDMA_PRIORITY_HIGH;
+  edma_init_struct.loop_mode_enable = FALSE;
+  edma_init_struct.buffer_size = 0;
+  edma_init_struct.peripheral_base_addr = (uint32_t)&QSPI1->dt;
+
+  edma_init_struct.direction = EDMA_DIR_MEMORY_TO_PERIPHERAL;
+  edma_init(EDMA_STREAM1, &edma_init_struct);
+
+  edma_init_struct.direction = EDMA_DIR_PERIPHERAL_TO_MEMORY;
+  edma_init(EDMA_STREAM2, &edma_init_struct);
+
+  edma_stream_enable(EDMA_STREAM1, FALSE);
+  edma_stream_enable(EDMA_STREAM2, FALSE);
+  aps_edma_clear_stream1_flags();
+  aps_edma_clear_stream2_flags();
+
+  aps6404l_edma_inited = 1;
+}
+
+static int aps_edma_wait_fdt(uint32_t fdt_flag, uint32_t ferr_flag, uint32_t dmerr_flag, uint32_t dterr_flag, uint32_t timeout)
+{
+  while(edma_flag_get(fdt_flag) == RESET)
+  {
+    if(edma_flag_get(ferr_flag) != RESET)
+    {
+      return 0;
+    }
+    if(edma_flag_get(dmerr_flag) != RESET)
+    {
+      return 0;
+    }
+    if(edma_flag_get(dterr_flag) != RESET)
+    {
+      return 0;
+    }
+    if(timeout-- == 0)
+    {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 /**
   * @brief  Reset APS6404L via command-port (0x66, 0x99).
   * @note   Requires QSPI1 to be configured and wired to APS6404L.
@@ -149,11 +226,8 @@ void PSRAM_Reset(void)
 {
   qspi_cmd_type cmd;
 
-  aps6404l_hw_stage = 1;
   if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
   {
-    /* failed to switch to command-port mode */
-    aps6404l_hw_stage = 0xEA;
     return;
   }
 
@@ -169,31 +243,24 @@ void PSRAM_Reset(void)
   cmd.read_status_enable = TRUE;
   cmd.write_data_enable = FALSE;
 
-  aps6404l_hw_stage = 2;
   qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
   cmd.instruction_code = APS6404L_RESET_ENABLE;
   qspi_cmd_operation_kick(QSPI1, &cmd);
   if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
   {
-    /* reset-enable command did not complete */
-    aps6404l_hw_stage = 0xE1;
     aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
     return;
   }
 
-  aps6404l_hw_stage = 3;
   qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
   cmd.instruction_code = APS6404L_RESET;
   qspi_cmd_operation_kick(QSPI1, &cmd);
   if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
   {
-    /* reset command did not complete */
-    aps6404l_hw_stage = 0xE2;
     aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
     return;
   }
 
-  aps6404l_hw_stage = 0;
   aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
 }
 
@@ -220,11 +287,8 @@ int PSRAM_ReadID(unsigned char *pBuffer, int nLength)
 
   total_len = (uint32_t)nLength + 3U;
 
-  aps6404l_hw_stage = 10;
   if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
   {
-    /* failed to switch to command-port mode */
-    aps6404l_hw_stage = 0xEA;
     return 0;
   }
 
@@ -241,15 +305,11 @@ int PSRAM_ReadID(unsigned char *pBuffer, int nLength)
   cmd.read_status_enable = TRUE;
   cmd.write_data_enable = FALSE;
 
-  aps6404l_hw_stage = 11;
   qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
   qspi_cmd_operation_kick(QSPI1, &cmd);
 
-  aps6404l_hw_stage = 12;
   if(!qspi_wait_cmd_flag(QSPI1, APS6404L_HW_TIMEOUT))
   {
-    /* command did not complete */
-    aps6404l_hw_stage = 0xE3;
     aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
     return 0;
   }
@@ -282,7 +342,6 @@ int PSRAM_ReadID(unsigned char *pBuffer, int nLength)
 
   qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
 
-  aps6404l_hw_stage = 0;
   aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
   return 1;
 }
@@ -305,11 +364,8 @@ int PSRAM_QPI_Write(unsigned int address, const unsigned char *pBuffer, int nLen
     return 0;
   }
 
-  aps6404l_hw_stage = 20;
   if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
   {
-    /* failed to switch to command-port mode */
-    aps6404l_hw_stage = 0xEA;
     return 0;
   }
 
@@ -333,8 +389,6 @@ int PSRAM_QPI_Write(unsigned int address, const unsigned char *pBuffer, int nLen
   {
     if(!qspi_wait_txfifo_ready(QSPI1, APS6404L_HW_TIMEOUT))
     {
-      /* TX FIFO did not become ready */
-      aps6404l_hw_stage = 0xE6;
       aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
       return 0;
     }
@@ -343,13 +397,10 @@ int PSRAM_QPI_Write(unsigned int address, const unsigned char *pBuffer, int nLen
 
   if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
   {
-    /* command did not complete */
-    aps6404l_hw_stage = 0xE7;
     aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
     return 0;
   }
 
-  aps6404l_hw_stage = 0;
   aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
   return 1;
 }
@@ -366,7 +417,6 @@ int PSRAM_QPI_Read(unsigned int address, unsigned char *pBuffer, int nLength)
 {
   int i;
   qspi_cmd_type cmd;
-  volatile unsigned int delay;
   unsigned int timeout;
 
   if(nLength <= 0)
@@ -374,11 +424,8 @@ int PSRAM_QPI_Read(unsigned int address, unsigned char *pBuffer, int nLength)
     return 0;
   }
 
-  aps6404l_hw_stage = 30;
   if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
   {
-    /* failed to switch to command-port mode */
-    aps6404l_hw_stage = 0xEA;
     return 0;
   }
 
@@ -398,39 +445,31 @@ int PSRAM_QPI_Read(unsigned int address, unsigned char *pBuffer, int nLength)
   qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
   qspi_cmd_operation_kick(QSPI1, &cmd);
 
-  aps6404l_hw_stage = 32;
-  timeout = APS6404L_HW_TIMEOUT;
-  while(qspi_flag_get(QSPI1, QSPI_CMDSTS_FLAG) == RESET)
-  {
-    if(timeout-- == 0)
-    {
-      /* command did not complete */
-      aps6404l_hw_stage = 0xE8;
-      aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
-      return 0;
-    }
-  }
-
   for(i = 0; i < nLength; i++)
   {
-    delay = 16;
-    while(delay--)
+    timeout = 200000U;
+    while(qspi_flag_get(QSPI1, QSPI_RXFIFORDY_FLAG) == RESET)
     {
-      __NOP();
+      if(timeout-- == 0U)
+      {
+        aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+        return 0;
+      }
     }
     pBuffer[i] = (unsigned char)qspi_byte_read(QSPI1);
   }
 
-  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
-
-  if(!aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT))
+  if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
   {
-    /* failed to switch back to XIP mode */
-    aps6404l_hw_stage = 0xEA;
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
     return 0;
   }
 
-  aps6404l_hw_stage = 0;
+  if(!aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT))
+  {
+    return 0;
+  }
+
   return 1;
 }
 
@@ -438,7 +477,6 @@ int PSRAM_QPI_FastRead(unsigned int address, unsigned char *pBuffer, int nLength
 {
   int i;
   qspi_cmd_type cmd;
-  volatile unsigned int delay;
   unsigned int timeout;
 
   if(nLength <= 0)
@@ -446,10 +484,8 @@ int PSRAM_QPI_FastRead(unsigned int address, unsigned char *pBuffer, int nLength
     return 0;
   }
 
-  aps6404l_hw_stage = 50;
   if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
   {
-    aps6404l_hw_stage = 0xEA;
     return 0;
   }
 
@@ -469,37 +505,31 @@ int PSRAM_QPI_FastRead(unsigned int address, unsigned char *pBuffer, int nLength
   qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
   qspi_cmd_operation_kick(QSPI1, &cmd);
 
-  aps6404l_hw_stage = 52;
-  timeout = APS6404L_HW_TIMEOUT;
-  while(qspi_flag_get(QSPI1, QSPI_CMDSTS_FLAG) == RESET)
-  {
-    if(timeout-- == 0)
-    {
-      aps6404l_hw_stage = 0xE8;
-      aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
-      return 0;
-    }
-  }
-
   for(i = 0; i < nLength; i++)
   {
-    delay = 16;
-    while(delay--)
+    timeout = 200000U;
+    while(qspi_flag_get(QSPI1, QSPI_RXFIFORDY_FLAG) == RESET)
     {
-      __NOP();
+      if(timeout-- == 0U)
+      {
+        aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+        return 0;
+      }
     }
     pBuffer[i] = (unsigned char)qspi_byte_read(QSPI1);
   }
 
-  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
-
-  if(!aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT))
+  if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
   {
-    aps6404l_hw_stage = 0xEA;
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
     return 0;
   }
 
-  aps6404l_hw_stage = 0;
+  if(!aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT))
+  {
+    return 0;
+  }
+
   return 1;
 }
 
@@ -513,10 +543,8 @@ int PSRAM_QPI_FastWrite(unsigned int address, const unsigned char *pBuffer, int 
     return 0;
   }
 
-  aps6404l_hw_stage = 60;
   if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
   {
-    aps6404l_hw_stage = 0xEA;
     return 0;
   }
 
@@ -540,7 +568,6 @@ int PSRAM_QPI_FastWrite(unsigned int address, const unsigned char *pBuffer, int 
   {
     if(!qspi_wait_txfifo_ready(QSPI1, APS6404L_HW_TIMEOUT))
     {
-      aps6404l_hw_stage = 0xE6;
       aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
       return 0;
     }
@@ -549,13 +576,321 @@ int PSRAM_QPI_FastWrite(unsigned int address, const unsigned char *pBuffer, int 
 
   if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
   {
-    aps6404l_hw_stage = 0xE7;
     aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
     return 0;
   }
 
-  aps6404l_hw_stage = 0;
   aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+  return 1;
+}
+
+int PSRAM_EDMA_Write(unsigned int address, const unsigned char *pBuffer, int nLength)
+{
+  qspi_cmd_type qpi_cmd;
+  qspi_cmd_type cmd;
+  qspi_cmd_type exit_cmd;
+  qspi_cmd_type exit_cmd2;
+  uint32_t word_count;
+  uint32_t word_bytes;
+  uint32_t remain_bytes;
+
+  if(nLength <= 0)
+  {
+    return 0;
+  }
+
+  if(((uint32_t)pBuffer & 3U) != 0U)
+  {
+    return PSRAM_QPI_Write(address, pBuffer, nLength);
+  }
+
+  if((uint32_t)nLength < 32U)
+  {
+    return PSRAM_QPI_Write(address, pBuffer, nLength);
+  }
+
+  word_count = (uint32_t)nLength >> 2;
+  if(word_count < 8U)
+  {
+    return PSRAM_QPI_Write(address, pBuffer, nLength);
+  }
+
+  if(word_count > 0xFFFFU)
+  {
+    word_count = 0xFFFFU;
+  }
+
+  word_bytes = word_count << 2;
+  remain_bytes = (uint32_t)nLength - word_bytes;
+
+  if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
+  {
+    return 0;
+  }
+
+  aps_edma_init_once();
+
+  qspi_dma_enable(QSPI1, FALSE);
+
+  qpi_cmd.pe_mode_enable = FALSE;
+  qpi_cmd.pe_mode_operate_code = 0;
+  qpi_cmd.instruction_code = APS6404L_ENTER_QUAD_MODE;
+  qpi_cmd.instruction_length = QSPI_CMD_INSLEN_1_BYTE;
+  qpi_cmd.address_code = 0;
+  qpi_cmd.address_length = QSPI_CMD_ADRLEN_0_BYTE;
+  qpi_cmd.data_counter = 0;
+  qpi_cmd.second_dummy_cycle_num = 0;
+  qpi_cmd.operation_mode = QSPI_OPERATE_MODE_111;
+  qpi_cmd.read_status_config = QSPI_RSTSC_SW_ONCE;
+  qpi_cmd.read_status_enable = TRUE;
+  qpi_cmd.write_data_enable = FALSE;
+
+  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
+  qspi_cmd_operation_kick(QSPI1, &qpi_cmd);
+  if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
+  {
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+    return 0;
+  }
+
+  cmd.pe_mode_enable = FALSE;
+  cmd.pe_mode_operate_code = 0;
+  cmd.instruction_code = APS6404L_QUAD_WRITE;
+  cmd.instruction_length = QSPI_CMD_INSLEN_1_BYTE;
+  cmd.address_code = address;
+  cmd.address_length = QSPI_CMD_ADRLEN_3_BYTE;
+  cmd.data_counter = word_bytes;
+  cmd.second_dummy_cycle_num = 0;
+  cmd.operation_mode = QSPI_OPERATE_MODE_444;
+  cmd.read_status_config = QSPI_RSTSC_HW_AUTO;
+  cmd.read_status_enable = FALSE;
+  cmd.write_data_enable = TRUE;
+
+  edma_stream_enable(EDMA_STREAM1, FALSE);
+  aps_edma_clear_stream1_flags();
+  EDMA_STREAM1->dtcnt = (uint16_t)word_count;
+  EDMA_STREAM1->paddr = (uint32_t)&QSPI1->dt;
+  EDMA_STREAM1->m0addr = (uint32_t)pBuffer;
+
+  qspi_dma_enable(QSPI1, TRUE);
+  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
+  qspi_cmd_operation_kick(QSPI1, &cmd);
+
+  edma_stream_enable(EDMA_STREAM1, TRUE);
+  if(!aps_edma_wait_fdt(EDMA_FDT1_FLAG, EDMA_FERR1_FLAG, EDMA_DMERR1_FLAG, EDMA_DTERR1_FLAG, APS6404L_HW_TIMEOUT))
+  {
+    edma_stream_enable(EDMA_STREAM1, FALSE);
+    qspi_dma_enable(QSPI1, FALSE);
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+    return 0;
+  }
+
+  edma_stream_enable(EDMA_STREAM1, FALSE);
+  aps_edma_clear_stream1_flags();
+
+  if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
+  {
+    qspi_dma_enable(QSPI1, FALSE);
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+    return 0;
+  }
+
+  qspi_dma_enable(QSPI1, FALSE);
+
+  exit_cmd.pe_mode_enable = FALSE;
+  exit_cmd.pe_mode_operate_code = 0;
+  exit_cmd.instruction_code = APS6404L_EXIT_QUAD_MODE;
+  exit_cmd.instruction_length = QSPI_CMD_INSLEN_1_BYTE;
+  exit_cmd.address_code = 0;
+  exit_cmd.address_length = QSPI_CMD_ADRLEN_0_BYTE;
+  exit_cmd.data_counter = 0;
+  exit_cmd.second_dummy_cycle_num = 0;
+  exit_cmd.operation_mode = QSPI_OPERATE_MODE_444;
+  exit_cmd.read_status_config = QSPI_RSTSC_SW_ONCE;
+  exit_cmd.read_status_enable = TRUE;
+  exit_cmd.write_data_enable = FALSE;
+
+  exit_cmd2 = exit_cmd;
+  exit_cmd2.operation_mode = QSPI_OPERATE_MODE_111;
+
+  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
+  qspi_cmd_operation_kick(QSPI1, &exit_cmd);
+  if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
+  {
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+    return 0;
+  }
+
+  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
+  qspi_cmd_operation_kick(QSPI1, &exit_cmd2);
+  if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
+  {
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+    return 0;
+  }
+
+  aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+
+  if(remain_bytes != 0U)
+  {
+    return PSRAM_QPI_Write(address + word_bytes, pBuffer + word_bytes, (int)remain_bytes);
+  }
+
+  return 1;
+}
+
+int PSRAM_EDMA_Read(unsigned int address, unsigned char *pBuffer, int nLength)
+{
+  qspi_cmd_type qpi_cmd;
+  qspi_cmd_type cmd;
+  qspi_cmd_type exit_cmd;
+  qspi_cmd_type exit_cmd2;
+  uint32_t word_count;
+  uint32_t word_bytes;
+  uint32_t remain_bytes;
+
+  if(nLength <= 0)
+  {
+    return 0;
+  }
+
+  if(((uint32_t)pBuffer & 3U) != 0U)
+  {
+    return PSRAM_QPI_Read(address, pBuffer, nLength);
+  }
+
+  if((uint32_t)nLength < 32U)
+  {
+    return PSRAM_QPI_Read(address, pBuffer, nLength);
+  }
+
+  word_count = (uint32_t)nLength >> 2;
+  if(word_count < 8U)
+  {
+    return PSRAM_QPI_Read(address, pBuffer, nLength);
+  }
+
+  if(word_count > 0xFFFFU)
+  {
+    word_count = 0xFFFFU;
+  }
+
+  word_bytes = word_count << 2;
+  remain_bytes = (uint32_t)nLength - word_bytes;
+
+  if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
+  {
+    return 0;
+  }
+
+  aps_edma_init_once();
+
+  qspi_dma_enable(QSPI1, FALSE);
+
+  qpi_cmd.pe_mode_enable = FALSE;
+  qpi_cmd.pe_mode_operate_code = 0;
+  qpi_cmd.instruction_code = APS6404L_ENTER_QUAD_MODE;
+  qpi_cmd.instruction_length = QSPI_CMD_INSLEN_1_BYTE;
+  qpi_cmd.address_code = 0;
+  qpi_cmd.address_length = QSPI_CMD_ADRLEN_0_BYTE;
+  qpi_cmd.data_counter = 0;
+  qpi_cmd.second_dummy_cycle_num = 0;
+  qpi_cmd.operation_mode = QSPI_OPERATE_MODE_111;
+  qpi_cmd.read_status_config = QSPI_RSTSC_SW_ONCE;
+  qpi_cmd.read_status_enable = TRUE;
+  qpi_cmd.write_data_enable = FALSE;
+
+  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
+  qspi_cmd_operation_kick(QSPI1, &qpi_cmd);
+  if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
+  {
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+    return 0;
+  }
+
+  cmd.pe_mode_enable = FALSE;
+  cmd.pe_mode_operate_code = 0;
+  cmd.instruction_code = APS6404L_QUAD_READ;
+  cmd.instruction_length = QSPI_CMD_INSLEN_1_BYTE;
+  cmd.address_code = address;
+  cmd.address_length = QSPI_CMD_ADRLEN_3_BYTE;
+  cmd.data_counter = word_bytes;
+  cmd.second_dummy_cycle_num = APS6404L_FAST_READ_DUMMY_CYCLES;
+  cmd.operation_mode = QSPI_OPERATE_MODE_444;
+  cmd.read_status_config = QSPI_RSTSC_HW_AUTO;
+  cmd.read_status_enable = FALSE;
+  cmd.write_data_enable = FALSE;
+
+  edma_stream_enable(EDMA_STREAM2, FALSE);
+  aps_edma_clear_stream2_flags();
+  EDMA_STREAM2->dtcnt = (uint16_t)word_count;
+  EDMA_STREAM2->paddr = (uint32_t)&QSPI1->dt;
+  EDMA_STREAM2->m0addr = (uint32_t)pBuffer;
+
+  qspi_dma_enable(QSPI1, TRUE);
+  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
+  qspi_cmd_operation_kick(QSPI1, &cmd);
+
+  edma_stream_enable(EDMA_STREAM2, TRUE);
+  if(!aps_edma_wait_fdt(EDMA_FDT2_FLAG, EDMA_FERR2_FLAG, EDMA_DMERR2_FLAG, EDMA_DTERR2_FLAG, APS6404L_HW_TIMEOUT))
+  {
+    edma_stream_enable(EDMA_STREAM2, FALSE);
+    qspi_dma_enable(QSPI1, FALSE);
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+    return 0;
+  }
+
+  edma_stream_enable(EDMA_STREAM2, FALSE);
+  aps_edma_clear_stream2_flags();
+
+  if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
+  {
+    qspi_dma_enable(QSPI1, FALSE);
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+    return 0;
+  }
+
+  qspi_dma_enable(QSPI1, FALSE);
+
+  exit_cmd.pe_mode_enable = FALSE;
+  exit_cmd.pe_mode_operate_code = 0;
+  exit_cmd.instruction_code = APS6404L_EXIT_QUAD_MODE;
+  exit_cmd.instruction_length = QSPI_CMD_INSLEN_1_BYTE;
+  exit_cmd.address_code = 0;
+  exit_cmd.address_length = QSPI_CMD_ADRLEN_0_BYTE;
+  exit_cmd.data_counter = 0;
+  exit_cmd.second_dummy_cycle_num = 0;
+  exit_cmd.operation_mode = QSPI_OPERATE_MODE_444;
+  exit_cmd.read_status_config = QSPI_RSTSC_SW_ONCE;
+  exit_cmd.read_status_enable = TRUE;
+  exit_cmd.write_data_enable = FALSE;
+
+  exit_cmd2 = exit_cmd;
+  exit_cmd2.operation_mode = QSPI_OPERATE_MODE_111;
+
+  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
+  qspi_cmd_operation_kick(QSPI1, &exit_cmd);
+  if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
+  {
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+    return 0;
+  }
+
+  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
+  qspi_cmd_operation_kick(QSPI1, &exit_cmd2);
+  if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
+  {
+    aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+    return 0;
+  }
+
+  aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
+
+  if(remain_bytes != 0U)
+  {
+    return PSRAM_QPI_Read(address + word_bytes, pBuffer + word_bytes, (int)remain_bytes);
+  }
+
   return 1;
 }
 
@@ -567,10 +902,8 @@ int PSRAM_EnterQuadMode(void)
 {
   qspi_cmd_type cmd;
 
-  aps6404l_hw_stage = 40;
   if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
   {
-    aps6404l_hw_stage = 0xEA;
     return 0;
   }
 
@@ -591,12 +924,10 @@ int PSRAM_EnterQuadMode(void)
   qspi_cmd_operation_kick(QSPI1, &cmd);
   if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
   {
-    aps6404l_hw_stage = 0xE9;
     aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
     return 0;
   }
 
-  aps6404l_hw_stage = 0;
   aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
   return 1;
 }
@@ -610,10 +941,8 @@ int PSRAM_ExitQuadMode(void)
   qspi_cmd_type cmd;
   qspi_cmd_type cmd2;
 
-  aps6404l_hw_stage = 41;
   if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
   {
-    aps6404l_hw_stage = 0xEA;
     return 0;
   }
 
@@ -634,7 +963,6 @@ int PSRAM_ExitQuadMode(void)
   qspi_cmd_operation_kick(QSPI1, &cmd);
   if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
   {
-    aps6404l_hw_stage = 0xE9;
     aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
     return 0;
   }
@@ -645,12 +973,10 @@ int PSRAM_ExitQuadMode(void)
   qspi_cmd_operation_kick(QSPI1, &cmd2);
   if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
   {
-    aps6404l_hw_stage = 0xE9;
     aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
     return 0;
   }
 
-  aps6404l_hw_stage = 0;
   aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
   return 1;
 }
@@ -659,14 +985,12 @@ int PSRAM_ExitQuadMode(void)
   * @brief  Toggle wrap boundary mode (0xC0).
   * @retval 1 on success, 0 on failure.
   */
-int APS6404LHwWrapBoundaryToggle(void)
+int PSRAM_ToggleWrapBoundary(void)
 {
   qspi_cmd_type cmd;
 
-  aps6404l_hw_stage = 42;
   if(!aps_qspi_xip_enable(FALSE, APS6404L_HW_TIMEOUT))
   {
-    aps6404l_hw_stage = 0xEA;
     return 0;
   }
 
@@ -687,12 +1011,10 @@ int APS6404LHwWrapBoundaryToggle(void)
   qspi_cmd_operation_kick(QSPI1, &cmd);
   if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
   {
-    aps6404l_hw_stage = 0xE9;
     aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
     return 0;
   }
 
-  aps6404l_hw_stage = 0;
   aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
   return 1;
 }

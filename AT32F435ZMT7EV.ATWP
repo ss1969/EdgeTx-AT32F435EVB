@@ -52,6 +52,7 @@
     <SPI1>
         <Mode>
             <ModeSub name="Mode" value="Simplex_Bidirectional_Master"/>
+            <ModeSub name="CS_Signal" value="CS_Signal_Hard_Output"/>
         </Mode>
         <Parameters>
             <ParametersSub name="TransmissionMode" value="SPI_TRANSMIT_HALF_DUPLEX_TX"/>
@@ -141,9 +142,6 @@
         <Signal SignalName="GPIO_Output" PinName="PE12">
             <Parameters name="Label" value="SPI1_DCX"/>
         </Signal>
-        <Signal SignalName="GPIO_Output" PinName="PE14">
-            <Parameters name="Label" value="SPI1_CS"/>
-        </Signal>
         <Signal SignalName="GPIO_Output" PinName="PD13">
             <Parameters name="GPIO_Type" value="GPIO_OUTPUT_OPEN_DRAIN"/>
             <Parameters name="Label" value="LED2"/>
@@ -191,6 +189,7 @@
         <PinSub pinname="PC3" signalname="QSPI2_IO1" signaltype="2"/>
         <PinSub pinname="PA0" signalname="EXINT0" signaltype="3"/>
         <PinSub pinname="PA3" signalname="QSPI2_IO3" signaltype="2"/>
+        <PinSub pinname="PA4" signalname="SPI1_CS" signaltype="2"/>
         <PinSub pinname="PA5" signalname="QSPI2_IO2" signaltype="2"/>
         <PinSub pinname="PA7" signalname="GPIO_Output" signaltype="3"/>
         <PinSub pinname="PC4" signalname="USART3_TX" signaltype="2"/>
@@ -200,7 +199,6 @@
         <PinSub pinname="PF11" signalname="GPIO_Input" signaltype="3"/>
         <PinSub pinname="PE12" signalname="GPIO_Output" signaltype="3"/>
         <PinSub pinname="PE13" signalname="SPI1_SCK" signaltype="2"/>
-        <PinSub pinname="PE14" signalname="GPIO_Output" signaltype="3"/>
         <PinSub pinname="PE15" signalname="SPI1_MOSI" signaltype="2"/>
         <PinSub pinname="PD13" signalname="GPIO_Output" signaltype="3"/>
         <PinSub pinname="PD14" signalname="GPIO_Output" signaltype="3"/>
@@ -224,7 +222,7 @@
         <ProjectLocation>D:/Projects/EdgeTX</ProjectLocation>
         <ToolchainIDE>MDK_V5</ToolchainIDE>
         <ARMCompiler>0</ARMCompiler>
-        <BackupCode>true</BackupCode>
+        <BackupCode>false</BackupCode>
         <KeepUserCode>true</KeepUserCode>
         <NotUsedPinAnalog>false</NotUsedPinAnalog>
         <CodeSplitIP>true</CodeSplitIP>

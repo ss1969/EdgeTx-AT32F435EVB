@@ -171,8 +171,6 @@ extern "C" {
 #define QSPI2_TE_GPIO_PORT    GPIOF
 #define SPI1_DCX_PIN    GPIO_PINS_12
 #define SPI1_DCX_GPIO_PORT    GPIOE
-#define SPI1_CS_PIN    GPIO_PINS_14
-#define SPI1_CS_GPIO_PORT    GPIOE
 #define LED2_PIN    GPIO_PINS_13
 #define LED2_GPIO_PORT    GPIOD
 #define LED3_PIN    GPIO_PINS_14

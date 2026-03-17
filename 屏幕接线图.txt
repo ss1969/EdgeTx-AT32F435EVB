@@ -1,0 +1,14 @@
+红VCC
+黑GND
+黄：LED PWR
+绿：17 Tearing		PF11 
+白：23 Reset			PA7
+橙：24 SCL			PB1
+黄：25 SDA/SDO1		PB0/IO0
+蓝：26 CS			PG8
+紫：29 DCX/SDO2		PC3/IO1
+棕：7  DB2/SDO3		PA5/IO2
+灰：8  DB3/SDO4		PA3/IO3
+
+
+

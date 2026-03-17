@@ -70,6 +70,15 @@ void wk_spi1_init(void)
   gpio_init_struct.gpio_pull = GPIO_PULL_NONE;
   gpio_init(GPIOE, &gpio_init_struct);
 
+  /* configure the CS pin */
+  gpio_pin_mux_config(GPIOA, GPIO_PINS_SOURCE4, GPIO_MUX_5);
+  gpio_init_struct.gpio_drive_strength = GPIO_DRIVE_STRENGTH_MODERATE;
+  gpio_init_struct.gpio_out_type = GPIO_OUTPUT_PUSH_PULL;
+  gpio_init_struct.gpio_mode = GPIO_MODE_MUX;
+  gpio_init_struct.gpio_pins = GPIO_PINS_4;
+  gpio_init_struct.gpio_pull = GPIO_PULL_NONE;
+  gpio_init(GPIOA, &gpio_init_struct);
+
   /* configure param */
   /* Set transmission direction using spi_half_duplex_direction_set(spi_type* spi_x, spi_half_duplex_direction_type direction) */
   spi_init_struct.transmission_mode = SPI_TRANSMIT_HALF_DUPLEX_TX;
@@ -79,8 +88,11 @@ void wk_spi1_init(void)
   spi_init_struct.mclk_freq_division = SPI_MCLK_DIV_4;
   spi_init_struct.clock_polarity = SPI_CLOCK_POLARITY_LOW;
   spi_init_struct.clock_phase = SPI_CLOCK_PHASE_1EDGE;
-  spi_init_struct.cs_mode_selection = SPI_CS_SOFTWARE_MODE;
+  spi_init_struct.cs_mode_selection = SPI_CS_HARDWARE_MODE;
   spi_init(SPI1, &spi_init_struct);
+
+  /* configure the cs pin output */
+  spi_hardware_cs_output_enable(SPI1, TRUE);
 
   /* add user code begin spi1_init 2 */
 

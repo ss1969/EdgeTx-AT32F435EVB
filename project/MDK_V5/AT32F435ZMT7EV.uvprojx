@@ -10,7 +10,7 @@
       <TargetName>AT32F435ZMT7EV</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
-      <pCCUsed>6230000::V6.23::ARMCLANG</pCCUsed>
+      <pCCUsed>6240000::V6.24::ARMCLANG</pCCUsed>
       <uAC6>1</uAC6>
       <TargetOption>
         <TargetCommonOption>
@@ -454,9 +454,14 @@
               <FilePath>..\src\qspi2_lcd_bus.c</FilePath>
             </File>
             <File>
-              <FileName>txw430038b0_nv3041a_01.c</FileName>
+              <FileName>spi1_lcd_bus.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\src\txw430038b0_nv3041a_01.c</FilePath>
+              <FilePath>..\src\spi1_lcd_bus.c</FilePath>
+            </File>
+            <File>
+              <FileName>txw430038b0_nv3041a_01_spi1.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\txw430038b0_nv3041a_01_spi1.c</FilePath>
             </File>
             <File>
               <FileName>wk_spi.c</FileName>

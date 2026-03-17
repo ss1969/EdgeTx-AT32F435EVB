@@ -118,10 +118,6 @@ void wk_qspi1_init(void)
 
   qspi_dma_tx_threshold_set(QSPI1, QSPI_DMA_FIFO_THOD_WORD08);
 
-  qspi_xip_cache_bypass_set(QSPI1, TRUE);
-
-  qspi_xip_enable(QSPI1, TRUE);
-
   /* add user code begin qspi1_init 2 */
 
   /* add user code end qspi1_init 2 */
@@ -160,7 +156,7 @@ void wk_qspi2_init(void)
   gpio_init_struct.gpio_out_type = GPIO_OUTPUT_PUSH_PULL;
   gpio_init_struct.gpio_mode = GPIO_MODE_MUX;
   gpio_init_struct.gpio_pins = GPIO_PINS_8;
-  gpio_init_struct.gpio_pull = GPIO_PULL_UP;
+  gpio_init_struct.gpio_pull = GPIO_PULL_NONE;
   gpio_init(GPIOG, &gpio_init_struct);
 
   /* configure the IO0 pin */

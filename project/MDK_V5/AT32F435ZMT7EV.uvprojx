@@ -10,7 +10,7 @@
       <TargetName>AT32F435ZMT7EV</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
-      <pCCUsed>6240000::V6.24::ARMCLANG</pCCUsed>
+      <pCCUsed>6230000::V6.23::ARMCLANG</pCCUsed>
       <uAC6>1</uAC6>
       <TargetOption>
         <TargetCommonOption>
@@ -419,11 +419,6 @@
               <FilePath>..\src\wk_qspi.c</FilePath>
             </File>
             <File>
-              <FileName>wk_spi.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\wk_spi.c</FilePath>
-            </File>
-            <File>
               <FileName>wk_usart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\src\wk_usart.c</FilePath>
@@ -452,6 +447,21 @@
               <FileName>uart3_printf.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\src\uart3_printf.c</FilePath>
+            </File>
+            <File>
+              <FileName>qspi2_lcd_bus.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\qspi2_lcd_bus.c</FilePath>
+            </File>
+            <File>
+              <FileName>txw430038b0_nv3041a_01.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\txw430038b0_nv3041a_01.c</FilePath>
+            </File>
+            <File>
+              <FileName>wk_spi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\wk_spi.c</FilePath>
             </File>
           </Files>
         </Group>

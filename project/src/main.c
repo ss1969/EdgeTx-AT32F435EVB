@@ -39,6 +39,8 @@
 /* private includes ----------------------------------------------------------*/
 /* add user code begin private includes */
 #include "aps6404l.h"
+#include "qspi2_lcd_bus.h"
+#include "txw430038b0_nv3041a_01.h"
 #include "uart3_printf.h"
 #include <stdlib.h>
 /* add user code end private includes */
@@ -109,6 +111,121 @@ static void aps_print_speed(const char *tag, uint32_t bytes, uint32_t cycles)
                (unsigned long)(mib_x10 / 10U),
                (unsigned long)(mib_x10 % 10U));
 }
+
+static inline void spi1_lcd_cs_low(void)
+{
+  gpio_bits_reset(SPI1_CS_GPIO_PORT, SPI1_CS_PIN);
+}
+
+static inline void spi1_lcd_cs_high(void)
+{
+  gpio_bits_set(SPI1_CS_GPIO_PORT, SPI1_CS_PIN);
+}
+
+static inline void spi1_lcd_dcx_cmd(void)
+{
+  gpio_bits_reset(SPI1_DCX_GPIO_PORT, SPI1_DCX_PIN);
+}
+
+static inline void spi1_lcd_dcx_data(void)
+{
+  gpio_bits_set(SPI1_DCX_GPIO_PORT, SPI1_DCX_PIN);
+}
+
+static int spi1_wait_flag_set(uint32_t flag, uint32_t timeout)
+{
+  while(spi_i2s_flag_get(SPI1, flag) == RESET)
+  {
+    if(timeout-- == 0U)
+    {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+static int spi1_wait_flag_reset(uint32_t flag, uint32_t timeout)
+{
+  while(spi_i2s_flag_get(SPI1, flag) == SET)
+  {
+    if(timeout-- == 0U)
+    {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+static int spi1_xfer8(uint8_t tx, uint8_t *rx)
+{
+  if(!spi1_wait_flag_set(SPI_I2S_TDBE_FLAG, 2000000U))
+  {
+    return 0;
+  }
+  spi_i2s_data_transmit(SPI1, tx);
+  if(!spi1_wait_flag_set(SPI_I2S_RDBF_FLAG, 2000000U))
+  {
+    return 0;
+  }
+  if(rx != 0)
+  {
+    *rx = (uint8_t)spi_i2s_data_receive(SPI1);
+  }
+  else
+  {
+    (void)spi_i2s_data_receive(SPI1);
+  }
+  return 1;
+}
+
+static int spi1_lcd_read_reg(uint8_t cmd, uint8_t *out, uint32_t out_len, uint32_t dummy_bytes)
+{
+  uint32_t i;
+  uint8_t tmp;
+
+  spi_half_duplex_direction_set(SPI1, SPI_HALF_DUPLEX_DIRECTION_TX);
+  spi1_lcd_cs_low();
+  spi1_lcd_dcx_cmd();
+  if(!spi1_xfer8(cmd, 0))
+  {
+    spi1_lcd_cs_high();
+    return 0;
+  }
+
+  spi1_lcd_dcx_data();
+  spi_half_duplex_direction_set(SPI1, SPI_HALF_DUPLEX_DIRECTION_RX);
+
+  for(i = 0; i < dummy_bytes; i++)
+  {
+    if(!spi1_xfer8(0x00, &tmp))
+    {
+      spi_half_duplex_direction_set(SPI1, SPI_HALF_DUPLEX_DIRECTION_TX);
+      spi1_lcd_cs_high();
+      return 0;
+    }
+  }
+
+  for(i = 0; i < out_len; i++)
+  {
+    if(!spi1_xfer8(0x00, &out[i]))
+    {
+      spi_half_duplex_direction_set(SPI1, SPI_HALF_DUPLEX_DIRECTION_TX);
+      spi1_lcd_cs_high();
+      return 0;
+    }
+  }
+
+  if(!spi1_wait_flag_reset(SPI_I2S_BF_FLAG, 2000000U))
+  {
+    spi_half_duplex_direction_set(SPI1, SPI_HALF_DUPLEX_DIRECTION_TX);
+    spi1_lcd_cs_high();
+    return 0;
+  }
+
+  spi_half_duplex_direction_set(SPI1, SPI_HALF_DUPLEX_DIRECTION_TX);
+  spi1_lcd_cs_high();
+  return 1;
+}
 /* add user code end 0 */
 
 /**
@@ -131,7 +248,9 @@ int main(void)
   /* nvic config. */
   wk_nvic_config();
 
-  /* timebase config. */
+  /* timebase config for
+     void wk_delay_us(uint32_t delay);
+     void wk_delay_ms(uint32_t delay); */
   wk_timebase_init();
 
   /* init gpio function. */
@@ -139,6 +258,15 @@ int main(void)
 
   /* init edma stream1 */
   wk_edma_stream1_init();
+  /* config edma stream transfer parameter */
+  /* user need to modify define values EDMA_STREAMx_XXX_BASE_ADDR 
+     and EDMA_STREAMx_BUFFER_SIZE in at32xxx_wk_config.h */
+  wk_edma_stream_config(EDMA_STREAM1, 
+                        (uint32_t)&QSPI1->dt, 
+                        EDMA_STREAM1_MEMORY0_BASE_ADDR, 
+                        EDMA_STREAM1_BUFFER_SIZE);
+  /* enable stream */
+  edma_stream_enable(EDMA_STREAM1, TRUE);
 
   /* init usart1 function. */
   wk_usart1_init();
@@ -183,6 +311,7 @@ int main(void)
 
     if(!ran)
     {
+#if 0
       int ok;
       unsigned char *write_buf;
       volatile unsigned char *psram = (volatile unsigned char *)APS6404L_MEM_BASE;
@@ -629,6 +758,172 @@ int main(void)
         }
         UART3_Printf("\r\n");
       }
+
+      ran = 1;
+#endif
+
+      {
+        uint8_t rd04_d0[3];
+        uint8_t rd04_d1[3];
+        uint8_t id_da_d0;
+        uint8_t id_da_d1;
+        uint8_t id_db_d0;
+        uint8_t id_db_d1;
+        uint8_t id_dc_d0;
+        uint8_t id_dc_d1;
+        int ok04_d0;
+        int ok04_d1;
+        int okda_d0;
+        int okda_d1;
+        int okdb_d0;
+        int okdb_d1;
+        int okdc_d0;
+        int okdc_d1;
+
+        rd04_d0[0] = 0;
+        rd04_d0[1] = 0;
+        rd04_d0[2] = 0;
+        rd04_d1[0] = 0;
+        rd04_d1[1] = 0;
+        rd04_d1[2] = 0;
+        id_da_d0 = 0;
+        id_da_d1 = 0;
+        id_db_d0 = 0;
+        id_db_d1 = 0;
+        id_dc_d0 = 0;
+        id_dc_d1 = 0;
+
+        spi1_lcd_cs_high();
+        gpio_bits_reset(QSPI2_RESET_GPIO_PORT, QSPI2_RESET_PIN);
+        wk_delay_ms(20);
+        gpio_bits_set(QSPI2_RESET_GPIO_PORT, QSPI2_RESET_PIN);
+        wk_delay_ms(20);
+
+        ok04_d0 = spi1_lcd_read_reg(0x04, rd04_d0, 3, 0);
+        ok04_d1 = spi1_lcd_read_reg(0x04, rd04_d1, 3, 1);
+
+        okda_d0 = spi1_lcd_read_reg(0xDA, &id_da_d0, 1, 0);
+        okda_d1 = spi1_lcd_read_reg(0xDA, &id_da_d1, 1, 1);
+        okdb_d0 = spi1_lcd_read_reg(0xDB, &id_db_d0, 1, 0);
+        okdb_d1 = spi1_lcd_read_reg(0xDB, &id_db_d1, 1, 1);
+        okdc_d0 = spi1_lcd_read_reg(0xDC, &id_dc_d0, 1, 0);
+        okdc_d1 = spi1_lcd_read_reg(0xDC, &id_dc_d1, 1, 1);
+
+        UART3_Printf("SPI1: RD04 d0 ok=%d data=", ok04_d0);
+        UART3_PrintHexByte(rd04_d0[0]);
+        UART3_PrintHexByte(rd04_d0[1]);
+        UART3_PrintHexByte(rd04_d0[2]);
+        UART3_Printf("\r\n");
+        UART3_Printf("SPI1: RD04 d1 ok=%d data=", ok04_d1);
+        UART3_PrintHexByte(rd04_d1[0]);
+        UART3_PrintHexByte(rd04_d1[1]);
+        UART3_PrintHexByte(rd04_d1[2]);
+        UART3_Printf("\r\n");
+
+        UART3_Printf("SPI1: RDDA d0 ok=%d data=", okda_d0);
+        UART3_PrintHexByte(id_da_d0);
+        UART3_Printf("  d1 ok=%d data=", okda_d1);
+        UART3_PrintHexByte(id_da_d1);
+        UART3_Printf("\r\n");
+        UART3_Printf("SPI1: RDDB d0 ok=%d data=", okdb_d0);
+        UART3_PrintHexByte(id_db_d0);
+        UART3_Printf("  d1 ok=%d data=", okdb_d1);
+        UART3_PrintHexByte(id_db_d1);
+        UART3_Printf("\r\n");
+        UART3_Printf("SPI1: RDDC d0 ok=%d data=", okdc_d0);
+        UART3_PrintHexByte(id_dc_d0);
+        UART3_Printf("  d1 ok=%d data=", okdc_d1);
+        UART3_PrintHexByte(id_dc_d1);
+        UART3_Printf("\r\n");
+      }
+
+#if 0
+      UART3_Printf("LCD: %s init\r\n", txw430038b0_nv3041a_01_name());
+      if(!txw430038b0_nv3041a_01_init())
+      {
+        qspi_operate_mode_type modes[3];
+        int mi;
+
+        UART3_Printf("LCD: init FAIL opmode=");
+        UART3_PrintHexU32((uint32_t)qspi2_lcd_bus_opmode_get());
+        UART3_Printf(" bus_err=");
+        UART3_PrintHexU32((uint32_t)qspi2_lcd_bus_last_error_get());
+        UART3_Printf(" ctrl=");
+        UART3_PrintHexU32(QSPI2->ctrl);
+        UART3_Printf(" fifosts=");
+        UART3_PrintHexU32(QSPI2->fifosts);
+        UART3_Printf(" cmdsts=");
+        UART3_PrintHexU32(QSPI2->cmdsts);
+        UART3_Printf("\r\n");
+
+        modes[0] = QSPI_OPERATE_MODE_114;
+        modes[1] = QSPI_OPERATE_MODE_144;
+        modes[2] = QSPI_OPERATE_MODE_444;
+
+        for(mi = 0; mi < 3; mi++)
+        {
+          qspi2_lcd_bus_opmode_set(modes[mi]);
+          UART3_Printf("LCD: retry opmode=");
+          UART3_PrintHexU32((uint32_t)modes[mi]);
+          UART3_Printf("\r\n");
+          if(txw430038b0_nv3041a_01_init())
+          {
+            UART3_Printf("LCD: init OK opmode=");
+            UART3_PrintHexU32((uint32_t)modes[mi]);
+            UART3_Printf("\r\n");
+            break;
+          }
+        }
+      }
+      else
+      {
+        static uint16_t line[TXW430038B0_WIDTH];
+        uint32_t x;
+        uint32_t y;
+
+        qspi2_lcd_bus_wait_te_rise(2000000U);
+
+        for(y = 0; y < TXW430038B0_HEIGHT; y++)
+        {
+          for(x = 0; x < TXW430038B0_WIDTH; x++)
+          {
+            uint32_t bar = (x * 8U) / TXW430038B0_WIDTH;
+            uint16_t color;
+
+            switch(bar)
+            {
+              case 0U: color = 0xF800U; break;
+              case 1U: color = 0x07E0U; break;
+              case 2U: color = 0x001FU; break;
+              case 3U: color = 0x07FFU; break;
+              case 4U: color = 0xF81FU; break;
+              case 5U: color = 0xFFE0U; break;
+              case 6U: color = 0xFFFFU; break;
+              default: color = 0x0000U; break;
+            }
+
+            line[x] = color;
+          }
+
+          if(!txw430038b0_nv3041a_01_set_window(0, (uint16_t)y, (uint16_t)(TXW430038B0_WIDTH - 1U), (uint16_t)y))
+          {
+            UART3_Printf("LCD: set_window FAIL y=");
+            UART3_PrintHexU32(y);
+            UART3_Printf("\r\n");
+            break;
+          }
+          if(!txw430038b0_nv3041a_01_write_pixels_rgb565(line, TXW430038B0_WIDTH))
+          {
+            UART3_Printf("LCD: write FAIL y=");
+            UART3_PrintHexU32(y);
+            UART3_Printf("\r\n");
+            break;
+          }
+        }
+
+        UART3_Printf("LCD: test done\r\n");
+      }
+#endif
 
       ran = 1;
     }

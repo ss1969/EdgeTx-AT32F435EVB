@@ -454,19 +454,24 @@
               <FilePath>..\src\qspi2_lcd_bus.c</FilePath>
             </File>
             <File>
-              <FileName>spi1_lcd_bus.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\spi1_lcd_bus.c</FilePath>
-            </File>
-            <File>
-              <FileName>txw430038b0_nv3041a_01_spi1.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\txw430038b0_nv3041a_01_spi1.c</FilePath>
-            </File>
-            <File>
               <FileName>wk_spi.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\src\wk_spi.c</FilePath>
+            </File>
+            <File>
+              <FileName>spi_lcd_bus.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\spi_lcd_bus.c</FilePath>
+            </File>
+            <File>
+              <FileName>txw430038b0_nv3041a_01_spi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\txw430038b0_nv3041a_01_spi.c</FilePath>
+            </File>
+            <File>
+              <FileName>wk_dma.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\wk_dma.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -497,6 +502,11 @@
               <FileName>at32f435_437_spi.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\libraries\drivers\src\at32f435_437_spi.c</FilePath>
+            </File>
+            <File>
+              <FileName>at32f435_437_dma.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\drivers\src\at32f435_437_dma.c</FilePath>
             </File>
             <File>
               <FileName>at32f435_437_edma.c</FileName>

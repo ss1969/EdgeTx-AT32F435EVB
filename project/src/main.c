@@ -32,6 +32,7 @@
 #include "wk_spi.h"
 #include "wk_usart.h"
 #include "wk_usb_otgfs.h"
+#include "wk_dma.h"
 #include "wk_edma.h"
 #include "wk_gpio.h"
 #include "wk_system.h"
@@ -39,8 +40,9 @@
 /* private includes ----------------------------------------------------------*/
 /* add user code begin private includes */
 #include "aps6404l.h"
-#include "spi1_lcd_bus.h"
-#include "txw430038b0_nv3041a_01_spi1.h"
+#include "spi_lcd_bus.h"
+#include "txw430038b0_nv3041a_01_spi.h"
+#include "cat_rgb565.h"
 #include "uart3_printf.h"
 #include <stdlib.h>
 /* add user code end private includes */
@@ -258,14 +260,25 @@ int main(void)
   /* init gpio function. */
   wk_gpio_config();
 
+  /* init dma1 channel1 */
+  wk_dma1_channel1_init();
+  /* config dma channel transfer parameter */
+  /* user need to modify define values DMAx_CHANNELy_XXX_BASE_ADDR
+     and DMAx_CHANNELy_BUFFER_SIZE in at32xxx_wk_config.h */
+  wk_dma_channel_config(DMA1_CHANNEL1,
+                        (uint32_t)&SPI1->dt,
+                        DMA1_CHANNEL1_MEMORY_BASE_ADDR,
+                        DMA1_CHANNEL1_BUFFER_SIZE);
+  dma_channel_enable(DMA1_CHANNEL1, FALSE);
+
   /* init edma stream1 */
   wk_edma_stream1_init();
   /* config edma stream transfer parameter */
-  /* user need to modify define values EDMA_STREAMx_XXX_BASE_ADDR 
+  /* user need to modify define values EDMA_STREAMx_XXX_BASE_ADDR
      and EDMA_STREAMx_BUFFER_SIZE in at32xxx_wk_config.h */
-  wk_edma_stream_config(EDMA_STREAM1, 
-                        (uint32_t)&QSPI1->dt, 
-                        EDMA_STREAM1_MEMORY0_BASE_ADDR, 
+  wk_edma_stream_config(EDMA_STREAM1,
+                        (uint32_t)&QSPI1->dt,
+                        EDMA_STREAM1_MEMORY0_BASE_ADDR,
                         EDMA_STREAM1_BUFFER_SIZE);
   /* enable stream */
   edma_stream_enable(EDMA_STREAM1, TRUE);
@@ -777,6 +790,10 @@ int main(void)
           static uint16_t line[TXW430038B0_WIDTH];
           uint32_t x;
           uint32_t y;
+          uint32_t t0;
+          uint32_t t1;
+          uint32_t draw_ms;
+          uint64_t cycles;
 
           UART3_Printf("LCD(SPI1): INVON 0x21\r\n");
           spi_lcd_bus_write_cmd(0x21);
@@ -843,6 +860,22 @@ int main(void)
               break;
             }
           }
+
+          wk_delay_ms(1000);
+          aps_perf_init();
+          t0 = aps_perf_cycles();
+          {
+            BitmapBuffer bmp;
+            bmp.width = (uint16_t)BMP_WIDTH;
+            bmp.height = (uint16_t)BMP_HEIGHT;
+            bmp.format = (uint16_t)BMP_FORMAT;
+            bmp.data = (uint8_t *)(void *)bmp_pixels;
+            txw430038b0_nv3041a_01_spi_drawBitmap(&bmp, 0, 0);
+          }
+          t1 = aps_perf_cycles();
+          cycles = (uint64_t)(uint32_t)(t1 - t0);
+          draw_ms = (uint32_t)((cycles * 1000ULL + ((uint64_t)SystemCoreClock / 2ULL)) / (uint64_t)SystemCoreClock);
+          UART3_Printf("LCD(SPI1): color.bmp draw_ms=%lu\r\n", (unsigned long)draw_ms);
 
           UART3_Printf("LCD(SPI1): test done\r\n");
         }

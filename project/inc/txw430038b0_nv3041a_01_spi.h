@@ -10,7 +10,16 @@ extern "C" {
 #define TXW430038B0_WIDTH 480U
 #define TXW430038B0_HEIGHT 272U
 
+typedef enum {
+  BMP_FORMAT_RGB565 = 0,   // 16位，R(5)G(6)B(5)
+  BMP_FORMAT_ARGB32,       // 32位，A(8)R(8)G(8)B(8)
+  BMP_FORMAT_LCD1,         // 1位单色 (黑白)
+  BMP_FORMAT_LCD4,         // 4位灰度
+  BMP_FORMAT_LCD8,         // 8位灰度
+} BitmapFormat;
+
 typedef int16_t coord_t;
+
 typedef struct BitmapBuffer {
   uint16_t width;
   uint16_t height;

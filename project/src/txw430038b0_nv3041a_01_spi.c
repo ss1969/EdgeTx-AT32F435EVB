@@ -1,6 +1,6 @@
-#include "txw430038b0_nv3041a_01_spi1.h"
+#include "txw430038b0_nv3041a_01_spi.h"
 
-#include "spi1_lcd_bus.h"
+#include "spi_lcd_bus.h"
 #include "wk_system.h"
 
 typedef struct

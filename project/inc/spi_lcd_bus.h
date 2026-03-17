@@ -19,6 +19,10 @@ extern "C" {
 #define SPI_LCD_BUS_USE_HW_CS 1
 #endif
 
+#ifndef SPI_LCD_BUS_USE_DMA
+#define SPI_LCD_BUS_USE_DMA 1
+#endif
+
 void spi_lcd_bus_init(void);
 void spi_lcd_bus_reset_pulse(uint32_t low_ms, uint32_t high_ms);
 void spi_lcd_bus_write_cmd(uint8_t cmd);

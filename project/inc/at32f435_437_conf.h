@@ -63,7 +63,7 @@ extern "C" {
 /*#define DAC_MODULE_ENABLED----------------------*/
 #define SPI_MODULE_ENABLED
 #define EDMA_MODULE_ENABLED
-/*#define DMA_MODULE_ENABLED----------------------*/
+#define DMA_MODULE_ENABLED
 #define DEBUG_MODULE_ENABLED
 #define FLASH_MODULE_ENABLED
 /*#define CRC_MODULE_ENABLED----------------------*/

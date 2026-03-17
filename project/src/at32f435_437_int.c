@@ -220,6 +220,46 @@ void SysTick_Handler(void)
   /* add user code end SysTick_IRQ 1 */
 }
 
+/**
+  * @brief  this function handles DMA1 Channel 1 handler.
+  * @param  none
+  * @retval none
+  */
+void DMA1_Channel1_IRQHandler(void)
+{
+  /* add user code begin DMA1_Channel1_IRQ 0 */
+
+  /* add user code end DMA1_Channel1_IRQ 0 */
+
+  if(dma_interrupt_flag_get(DMA1_FDT1_FLAG) != RESET)
+  {   
+    /* add user code begin DMA1_FDT1_FLAG */
+    /* handle full data transfer and clear flag */
+    dma_flag_clear(DMA1_FDT1_FLAG);
+    /* add user code end DMA1_FDT1_FLAG */ 
+  }
+
+  if(dma_interrupt_flag_get(DMA1_HDT1_FLAG) != RESET)
+  {   
+    /* add user code begin DMA1_HDT1_FLAG */
+    /* handle half data transfer and clear flag */
+    dma_flag_clear(DMA1_HDT1_FLAG);
+    /* add user code end DMA1_HDT1_FLAG */ 
+  }
+
+  if(dma_interrupt_flag_get(DMA1_DTERR1_FLAG) != RESET)
+  {   
+    /* add user code begin DMA1_DTERR1_FLAG */
+    /* handle error transfer and clear flag */
+    dma_flag_clear(DMA1_DTERR1_FLAG);
+    /* add user code end DMA1_DTERR1_FLAG */ 
+  }
+
+  /* add user code begin DMA1_Channel1_IRQ 1 */
+
+  /* add user code end DMA1_Channel1_IRQ 1 */
+}
+
 /* add user code begin 1 */
 
 /* add user code end 1 */

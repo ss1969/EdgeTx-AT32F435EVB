@@ -96,6 +96,16 @@
             <ModeSub name="Activate_VBUS" value="TRUE"/>
         </Mode>
     </USB_OTGFS1>
+    <DMA>
+        <SPI1_TX>
+            <ParametersSub name="Instance" value="DMA1_Channel1"/>
+            <ParametersSub name="SyncRequestCount" value="1"/>
+            <ParametersSub name="RequestCount" value="1"/>
+            <ParametersSub name="Interrupt_FDT" value="ENABLE"/>
+            <ParametersSub name="Interrupt_HDT" value="ENABLE"/>
+            <ParametersSub name="Interrupt_DTERR" value="ENABLE"/>
+        </SPI1_TX>
+    </DMA>
     <EDMA>
         <QSPI1>
             <ParametersSub name="Instance" value="EDMA_Stream1"/>
@@ -121,6 +131,7 @@
         <USART2_IRQHandler>0;0;0;0;0</USART2_IRQHandler>
         <USART3_IRQHandler>0;0;0;0;0</USART3_IRQHandler>
         <OTGFS1_WKUP_IRQHandler>0;0;0;0;0</OTGFS1_WKUP_IRQHandler>
+        <DMA1_Channel1_IRQHandler>1;0;0;0;0</DMA1_Channel1_IRQHandler>
         <OTGFS1_IRQHandler>0;0;0;0;0</OTGFS1_IRQHandler>
         <FPU_IRQHandler>0;0;0;0;0</FPU_IRQHandler>
         <QSPI2_IRQHandler>0;0;0;0;0</QSPI2_IRQHandler>

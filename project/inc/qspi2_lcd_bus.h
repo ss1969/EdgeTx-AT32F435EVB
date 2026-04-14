@@ -31,12 +31,9 @@ typedef struct
 void qspi2_lcd_bus_reset_pulse(uint32_t low_ms, uint32_t high_ms);
 int qspi2_lcd_bus_write(uint8_t cmd, const uint8_t *data, uint32_t len);
 int qspi2_lcd_bus_read(uint8_t cmd, uint8_t *data, uint32_t len, uint8_t dummy_cycles);
-int qspi2_lcd_bus_write_pixels_rgb565(uint8_t cmd, const uint16_t *pixels, uint32_t pixel_count);
+int qspi2_lcd_bus_write_pixels_rgb565(const uint16_t *pixels, uint32_t pixel_count);
 int qspi2_lcd_bus_wait_te_rise(uint32_t timeout);
 int qspi2_lcd_bus_wait_te_fall(uint32_t timeout);
-void qspi2_lcd_bus_opmode_set(qspi_operate_mode_type opmode);
-qspi_operate_mode_type qspi2_lcd_bus_opmode_get(void);
-int qspi2_lcd_bus_last_error_get(void);
 int qspi2_lcd_bus_read_03h(uint8_t addr, uint8_t *data, uint32_t len, uint8_t dummy_cycles);
 void qspi2_lcd_bus_diag_capture(qspi2_lcd_bus_diag_t *out);
 void qspi2_lcd_bus_diag_last_get(qspi2_lcd_bus_diag_t *after_kick, qspi2_lcd_bus_diag_t *before_exit);

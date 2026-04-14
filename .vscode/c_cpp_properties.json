@@ -1,0 +1,30 @@
+{
+  "configurations": [
+    {
+      "name": "AT32F435ZMT7EV",
+      "defines": [
+        "AT32F435ZMT7",
+        "USE_STDPERIPH_DRIVER"
+      ],
+      "includePath": [
+        "${workspaceFolder}/project/inc",
+        "${workspaceFolder}/project/src",
+        "${workspaceFolder}/libraries/drivers/inc",
+        "${workspaceFolder}/libraries/cmsis/cm4/core_support",
+        "${workspaceFolder}/libraries/cmsis/cm4/device_support"
+      ],
+      "browse": {
+        "path": [
+          "${workspaceFolder}/project/inc",
+          "${workspaceFolder}/project/src",
+          "${workspaceFolder}/libraries/drivers/inc",
+          "${workspaceFolder}/libraries/cmsis/cm4/core_support",
+          "${workspaceFolder}/libraries/cmsis/cm4/device_support"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      },
+      "cStandard": "c11"
+    }
+  ],
+  "version": 4
+}

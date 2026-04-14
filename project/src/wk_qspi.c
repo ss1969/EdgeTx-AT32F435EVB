@@ -178,22 +178,22 @@ void wk_qspi2_init(void)
   gpio_init(GPIOC, &gpio_init_struct);
 
   /* configure the IO2 pin */
-  gpio_pin_mux_config(GPIOA, GPIO_PINS_SOURCE5, GPIO_MUX_9);
+  gpio_pin_mux_config(GPIOE, GPIO_PINS_SOURCE9, GPIO_MUX_10);
   gpio_init_struct.gpio_drive_strength = GPIO_DRIVE_STRENGTH_MODERATE;
   gpio_init_struct.gpio_out_type = GPIO_OUTPUT_PUSH_PULL;
   gpio_init_struct.gpio_mode = GPIO_MODE_MUX;
-  gpio_init_struct.gpio_pins = GPIO_PINS_5;
+  gpio_init_struct.gpio_pins = GPIO_PINS_9;
   gpio_init_struct.gpio_pull = GPIO_PULL_NONE;
-  gpio_init(GPIOA, &gpio_init_struct);
+  gpio_init(GPIOE, &gpio_init_struct);
 
   /* configure the IO3 pin */
-  gpio_pin_mux_config(GPIOA, GPIO_PINS_SOURCE3, GPIO_MUX_9);
+  gpio_pin_mux_config(GPIOE, GPIO_PINS_SOURCE10, GPIO_MUX_10);
   gpio_init_struct.gpio_drive_strength = GPIO_DRIVE_STRENGTH_MODERATE;
   gpio_init_struct.gpio_out_type = GPIO_OUTPUT_PUSH_PULL;
   gpio_init_struct.gpio_mode = GPIO_MODE_MUX;
-  gpio_init_struct.gpio_pins = GPIO_PINS_3;
+  gpio_init_struct.gpio_pins = GPIO_PINS_10;
   gpio_init_struct.gpio_pull = GPIO_PULL_NONE;
-  gpio_init(GPIOA, &gpio_init_struct);
+  gpio_init(GPIOE, &gpio_init_struct);
 
  /* configure param */
   qspi_xip_enable(QSPI2, FALSE);
@@ -210,7 +210,9 @@ void wk_qspi2_init(void)
 
   qspi_dma_tx_threshold_set(QSPI2, QSPI_DMA_FIFO_THOD_WORD08);
 
-  qspi_xip_enable(QSPI2, TRUE);
+  /* Command-port LCD use still depends on a sane address space window.
+     Keep a large 24-bit span so long GRAM writes do not hit a tiny default. */
+  QSPI2->fsize = 0x00FFFFFFU;
 
   /* add user code begin qspi2_init 2 */
 

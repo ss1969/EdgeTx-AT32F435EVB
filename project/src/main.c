@@ -40,8 +40,12 @@
 /* private includes ----------------------------------------------------------*/
 /* add user code begin private includes */
 #include "aps6404l.h"
-#include "spi_lcd_bus.h"
 #include "txw430038b0_nv3041a_01_spi.h"
+#if TXW430038B0_LCD_BUS_MODE == TXW430038B0_LCD_BUS_MODE_QSPI2
+#include "qspi2_lcd_bus.h"
+#else
+#include "spi_lcd_bus.h"
+#endif
 #include "cat_rgb565.h"
 #include "uart3_printf.h"
 #include <stdlib.h>
@@ -75,6 +79,7 @@
 
 /* private function prototypes --------------------------------------------*/
 /* add user code begin function prototypes */
+static int lcd_fill_color(uint16_t color);
 
 /* add user code end function prototypes */
 
@@ -114,122 +119,185 @@ static void aps_print_speed(const char *tag, uint32_t bytes, uint32_t cycles)
                (unsigned long)(mib_x10 % 10U));
 }
 
-#if 0
-static inline void spi1_lcd_cs_low(void)
+static uint8_t uart3_getc_blocking(void)
 {
-  gpio_bits_reset(SPI1_CS_GPIO_PORT, SPI1_CS_PIN);
-}
-
-static inline void spi1_lcd_cs_high(void)
-{
-  gpio_bits_set(SPI1_CS_GPIO_PORT, SPI1_CS_PIN);
-}
-
-static inline void spi1_lcd_dcx_cmd(void)
-{
-  gpio_bits_reset(SPI1_DCX_GPIO_PORT, SPI1_DCX_PIN);
-}
-
-static inline void spi1_lcd_dcx_data(void)
-{
-  gpio_bits_set(SPI1_DCX_GPIO_PORT, SPI1_DCX_PIN);
-}
-
-static int spi1_wait_flag_set(uint32_t flag, uint32_t timeout)
-{
-  while(spi_i2s_flag_get(SPI1, flag) == RESET)
+  while(usart_flag_get(USART3, USART_RDBF_FLAG) == RESET)
   {
-    if(timeout-- == 0U)
-    {
-      return 0;
-    }
   }
-  return 1;
+
+  return (uint8_t)usart_data_receive(USART3);
 }
 
-static int spi1_wait_flag_reset(uint32_t flag, uint32_t timeout)
+static int hex_char_to_nibble(uint8_t ch, uint8_t *nibble)
 {
-  while(spi_i2s_flag_get(SPI1, flag) == SET)
-  {
-    if(timeout-- == 0U)
-    {
-      return 0;
-    }
-  }
-  return 1;
-}
-
-static int spi1_xfer8(uint8_t tx, uint8_t *rx)
-{
-  if(!spi1_wait_flag_set(SPI_I2S_TDBE_FLAG, 2000000U))
+  if(nibble == 0)
   {
     return 0;
   }
-  spi_i2s_data_transmit(SPI1, tx);
-  if(!spi1_wait_flag_set(SPI_I2S_RDBF_FLAG, 2000000U))
+
+  if((ch >= '0') && (ch <= '9'))
   {
-    return 0;
+    *nibble = (uint8_t)(ch - '0');
+    return 1;
   }
-  if(rx != 0)
+  if((ch >= 'A') && (ch <= 'F'))
   {
-    *rx = (uint8_t)spi_i2s_data_receive(SPI1);
+    *nibble = (uint8_t)(ch - 'A' + 10U);
+    return 1;
   }
-  else
+  if((ch >= 'a') && (ch <= 'f'))
   {
-    (void)spi_i2s_data_receive(SPI1);
+    *nibble = (uint8_t)(ch - 'a' + 10U);
+    return 1;
   }
-  return 1;
+
+  return 0;
 }
 
-static int spi1_lcd_read_reg(uint8_t cmd, uint8_t *out, uint32_t out_len, uint32_t dummy_bytes)
+static uint16_t uart3_read_hex_u16_blocking(void)
 {
+  uint16_t value = 0U;
+  uint32_t digits = 0U;
+  uint8_t nibble;
+  uint8_t ch;
+
+  for(;;)
+  {
+    ch = uart3_getc_blocking();
+    if((ch == '\r') || (ch == '\n') || (ch == ' ') || (ch == '\t'))
+    {
+      continue;
+    }
+    if(hex_char_to_nibble(ch, &nibble))
+    {
+      UART3_Printf("%c", ch);
+      value = (uint16_t)((value << 4) | nibble);
+      digits++;
+      if(digits >= 4U)
+      {
+        break;
+      }
+    }
+  }
+
+  UART3_Printf("\r\n");
+  return value;
+}
+
+static void lcd_uart_fill_loop(void)
+{
+  UART3_Printf("LCD: input 4 hex chars (0000-FFFF), fill screen with this value\r\n");
+
+  for(;;)
+  {
+    uint16_t color = uart3_read_hex_u16_blocking();
+
+    UART3_Printf("LCD: fill color=");
+    UART3_PrintHexByte((uint8_t)(color >> 8));
+    UART3_PrintHexByte((uint8_t)color);
+    UART3_Printf("\r\n");
+
+    if(!lcd_fill_color(color))
+    {
+      UART3_Printf("LCD: fill FAIL\r\n");
+    }
+  }
+}
+
+static int lcd_fill_color(uint16_t color)
+{
+  static uint16_t line[TXW430038B0_WIDTH];
+  uint32_t y;
   uint32_t i;
-  uint8_t tmp;
 
-  spi_half_duplex_direction_set(SPI1, SPI_HALF_DUPLEX_DIRECTION_TX);
-  spi1_lcd_cs_low();
-  spi1_lcd_dcx_cmd();
-  if(!spi1_xfer8(cmd, 0))
+  for(i = 0; i < TXW430038B0_WIDTH; i++)
   {
-    spi1_lcd_cs_high();
-    return 0;
+    line[i] = color;
   }
 
-  spi1_lcd_dcx_data();
-  spi_half_duplex_direction_set(SPI1, SPI_HALF_DUPLEX_DIRECTION_RX);
-
-  for(i = 0; i < dummy_bytes; i++)
+  for(y = 0; y < TXW430038B0_HEIGHT; y++)
   {
-    if(!spi1_xfer8(0x00, &tmp))
+    if(!txw430038b0_nv3041a_01_set_window(0U,
+                                          (uint16_t)y,
+                                          (uint16_t)(TXW430038B0_WIDTH - 1U),
+                                          (uint16_t)y))
     {
-      spi_half_duplex_direction_set(SPI1, SPI_HALF_DUPLEX_DIRECTION_TX);
-      spi1_lcd_cs_high();
+      return 0;
+    }
+    if(!txw430038b0_nv3041a_01_write_pixels_rgb565(line, TXW430038B0_WIDTH))
+    {
       return 0;
     }
   }
 
-  for(i = 0; i < out_len; i++)
-  {
-    if(!spi1_xfer8(0x00, &out[i]))
-    {
-      spi_half_duplex_direction_set(SPI1, SPI_HALF_DUPLEX_DIRECTION_TX);
-      spi1_lcd_cs_high();
-      return 0;
-    }
-  }
-
-  if(!spi1_wait_flag_reset(SPI_I2S_BF_FLAG, 2000000U))
-  {
-    spi_half_duplex_direction_set(SPI1, SPI_HALF_DUPLEX_DIRECTION_TX);
-    spi1_lcd_cs_high();
-    return 0;
-  }
-
-  spi_half_duplex_direction_set(SPI1, SPI_HALF_DUPLEX_DIRECTION_TX);
-  spi1_lcd_cs_high();
   return 1;
 }
-#endif
+
+static int lcd_draw_test_bars(void)
+{
+  static const uint16_t test_colors[] = {
+    0xF800U, /* red */
+    0x07E0U, /* green */
+    0x001FU, /* blue */
+    0xFFFFU, /* white */
+    0x0000U  /* black */
+  };
+  static uint16_t line[TXW430038B0_WIDTH];
+  uint32_t y;
+  uint32_t x;
+
+  for(y = 0; y < TXW430038B0_HEIGHT; y++)
+  {
+    for(x = 0; x < TXW430038B0_WIDTH; x++)
+    {
+      uint32_t bar = (x * (uint32_t)(sizeof(test_colors) / sizeof(test_colors[0]))) / TXW430038B0_WIDTH;
+
+      if(bar >= (uint32_t)(sizeof(test_colors) / sizeof(test_colors[0])))
+      {
+        bar = (uint32_t)(sizeof(test_colors) / sizeof(test_colors[0])) - 1U;
+      }
+
+      line[x] = test_colors[bar];
+    }
+
+    if(!txw430038b0_nv3041a_01_set_window(0U,
+                                          (uint16_t)y,
+                                          (uint16_t)(TXW430038B0_WIDTH - 1U),
+                                          (uint16_t)y))
+    {
+      return 0;
+    }
+    if(!txw430038b0_nv3041a_01_write_pixels_rgb565(line, TXW430038B0_WIDTH))
+    {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+static void lcd_run_bmp_test(void)
+{
+  BitmapBuffer bmp;
+  uint32_t t0;
+  uint32_t t1;
+  uint32_t draw_ms;
+
+  bmp.width = BMP_WIDTH;
+  bmp.height = BMP_HEIGHT;
+  bmp.format = BMP_FORMAT_RGB565;
+  bmp.data = (uint8_t *)(void *)bmp_pixels;
+
+  aps_perf_init();
+  t0 = aps_perf_cycles();
+  txw430038b0_nv3041a_01_spi_drawBitmap(&bmp, 0, 0);
+  t1 = aps_perf_cycles();
+
+  draw_ms = (uint32_t)(((uint64_t)(t1 - t0) * 1000ULL) / (uint64_t)SystemCoreClock);
+  UART3_Printf("LCD: bmp draw_ms=%lu\r\n", (unsigned long)draw_ms);
+}
+
+
 /* add user code end 0 */
 
 /**
@@ -778,196 +846,37 @@ int main(void)
 #endif
 
       {
-        spi_lcd_bus_reset_pulse(20, 20);
-
-        UART3_Printf("LCD(SPI1): %s init\r\n", txw430038b0_nv3041a_01_spi1_name());
-        if(!txw430038b0_nv3041a_01_spi_init())
+        if(!txw430038b0_nv3041a_01_init())
         {
-          UART3_Printf("LCD(SPI1): init FAIL\r\n");
+          UART3_Printf("LCD: init FAIL\r\n");
+#if TXW430038B0_LCD_BUS_MODE == TXW430038B0_LCD_BUS_MODE_QSPI2
+          UART3_Printf("LCD: qspi2 bus fail\r\n");
+#endif
         }
         else
         {
-          static uint16_t line[TXW430038B0_WIDTH];
-          uint32_t x;
-          uint32_t y;
-          uint32_t t0;
-          uint32_t t1;
-          uint32_t draw_ms;
-          uint64_t cycles;
+          UART3_Printf("LCD: %s init OK\r\n", txw430038b0_nv3041a_01_name());
+          UART3_Printf("LCD: cfg bus=QSPI2 cmd=111 pixel=114 gram=RAM32 dctl=01 rgb=565\r\n");
 
-          UART3_Printf("LCD(SPI1): INVON 0x21\r\n");
-          spi_lcd_bus_write_cmd(0x21);
-
-          for(x = 0; x < TXW430038B0_WIDTH; x++)
-          {
-            line[x] = 0xFFFFU;
-          }
-
-          for(y = 0; y < TXW430038B0_HEIGHT; y++)
-          {
-            if(!txw430038b0_nv3041a_01_spi_set_window(0, (uint16_t)y, (uint16_t)(TXW430038B0_WIDTH - 1U), (uint16_t)y))
-            {
-              UART3_Printf("LCD(SPI1): set_window FAIL y=");
-              UART3_PrintHexU32(y);
-              UART3_Printf("\r\n");
-              break;
-            }
-            if(!txw430038b0_nv3041a_01_spi_write_pixels_rgb565(line, TXW430038B0_WIDTH))
-            {
-              UART3_Printf("LCD(SPI1): write FAIL y=");
-              UART3_PrintHexU32(y);
-              UART3_Printf("\r\n");
-              break;
-            }
-          }
-
-          wk_delay_ms(1000);
-
-          for(y = 0; y < TXW430038B0_HEIGHT; y++)
-          {
-            for(x = 0; x < TXW430038B0_WIDTH; x++)
-            {
-              uint32_t bar = (x * 8U) / TXW430038B0_WIDTH;
-              uint16_t color;
-
-              switch(bar)
-              {
-                case 0U: color = 0xF800U; break;
-                case 1U: color = 0x07E0U; break;
-                case 2U: color = 0x001FU; break;
-                case 3U: color = 0x07FFU; break;
-                case 4U: color = 0xF81FU; break;
-                case 5U: color = 0xFFE0U; break;
-                case 6U: color = 0xFFFFU; break;
-                default: color = 0x0000U; break;
-              }
-
-              line[x] = color;
-            }
-
-            if(!txw430038b0_nv3041a_01_spi_set_window(0, (uint16_t)y, (uint16_t)(TXW430038B0_WIDTH - 1U), (uint16_t)y))
-            {
-              UART3_Printf("LCD(SPI1): set_window FAIL y=");
-              UART3_PrintHexU32(y);
-              UART3_Printf("\r\n");
-              break;
-            }
-            if(!txw430038b0_nv3041a_01_spi_write_pixels_rgb565(line, TXW430038B0_WIDTH))
-            {
-              UART3_Printf("LCD(SPI1): write FAIL y=");
-              UART3_PrintHexU32(y);
-              UART3_Printf("\r\n");
-              break;
-            }
-          }
-
-          wk_delay_ms(1000);
-          aps_perf_init();
-          t0 = aps_perf_cycles();
-          {
-            BitmapBuffer bmp;
-            bmp.width = (uint16_t)BMP_WIDTH;
-            bmp.height = (uint16_t)BMP_HEIGHT;
-            bmp.format = (uint16_t)BMP_FORMAT;
-            bmp.data = (uint8_t *)(void *)bmp_pixels;
-            txw430038b0_nv3041a_01_spi_drawBitmap(&bmp, 0, 0);
-          }
-          t1 = aps_perf_cycles();
-          cycles = (uint64_t)(uint32_t)(t1 - t0);
-          draw_ms = (uint32_t)((cycles * 1000ULL + ((uint64_t)SystemCoreClock / 2ULL)) / (uint64_t)SystemCoreClock);
-          UART3_Printf("LCD(SPI1): color.bmp draw_ms=%lu\r\n", (unsigned long)draw_ms);
-
-          UART3_Printf("LCD(SPI1): test done\r\n");
-        }
-      }
-
-#if 0
-      UART3_Printf("LCD: %s init\r\n", txw430038b0_nv3041a_01_name());
-      if(!txw430038b0_nv3041a_01_init())
-      {
-        qspi_operate_mode_type modes[3];
-        int mi;
-
-        UART3_Printf("LCD: init FAIL opmode=");
-        UART3_PrintHexU32((uint32_t)qspi2_lcd_bus_opmode_get());
-        UART3_Printf(" bus_err=");
-        UART3_PrintHexU32((uint32_t)qspi2_lcd_bus_last_error_get());
-        UART3_Printf(" ctrl=");
-        UART3_PrintHexU32(QSPI2->ctrl);
-        UART3_Printf(" fifosts=");
-        UART3_PrintHexU32(QSPI2->fifosts);
-        UART3_Printf(" cmdsts=");
-        UART3_PrintHexU32(QSPI2->cmdsts);
-        UART3_Printf("\r\n");
-
-        modes[0] = QSPI_OPERATE_MODE_114;
-        modes[1] = QSPI_OPERATE_MODE_144;
-        modes[2] = QSPI_OPERATE_MODE_444;
-
-        for(mi = 0; mi < 3; mi++)
-        {
-          qspi2_lcd_bus_opmode_set(modes[mi]);
-          UART3_Printf("LCD: retry opmode=");
-          UART3_PrintHexU32((uint32_t)modes[mi]);
-          UART3_Printf("\r\n");
-          if(txw430038b0_nv3041a_01_init())
-          {
-            UART3_Printf("LCD: init OK opmode=");
-            UART3_PrintHexU32((uint32_t)modes[mi]);
-            UART3_Printf("\r\n");
-            break;
-          }
-        }
-      }
-      else
-      {
-        static uint16_t line[TXW430038B0_WIDTH];
-        uint32_t x;
-        uint32_t y;
-
-        qspi2_lcd_bus_wait_te_rise(2000000U);
-
-        for(y = 0; y < TXW430038B0_HEIGHT; y++)
-        {
-          for(x = 0; x < TXW430038B0_WIDTH; x++)
-          {
-            uint32_t bar = (x * 8U) / TXW430038B0_WIDTH;
-            uint16_t color;
-
-            switch(bar)
-            {
-              case 0U: color = 0xF800U; break;
-              case 1U: color = 0x07E0U; break;
-              case 2U: color = 0x001FU; break;
-              case 3U: color = 0x07FFU; break;
-              case 4U: color = 0xF81FU; break;
-              case 5U: color = 0xFFE0U; break;
-              case 6U: color = 0xFFFFU; break;
-              default: color = 0x0000U; break;
-            }
-
-            line[x] = color;
-          }
-
-          if(!txw430038b0_nv3041a_01_set_window(0, (uint16_t)y, (uint16_t)(TXW430038B0_WIDTH - 1U), (uint16_t)y))
-          {
-            UART3_Printf("LCD: set_window FAIL y=");
-            UART3_PrintHexU32(y);
-            UART3_Printf("\r\n");
-            break;
-          }
-          if(!txw430038b0_nv3041a_01_write_pixels_rgb565(line, TXW430038B0_WIDTH))
-          {
-            UART3_Printf("LCD: write FAIL y=");
-            UART3_PrintHexU32(y);
-            UART3_Printf("\r\n");
-            break;
-          }
-        }
-
-        UART3_Printf("LCD: test done\r\n");
-      }
+#if TXW430038B0_LCD_BUS_MODE == TXW430038B0_LCD_BUS_MODE_QSPI2
+          wk_delay_ms(30);
+          (void)qspi2_lcd_bus_wait_te_fall(2000000U);
+          (void)qspi2_lcd_bus_wait_te_rise(2000000U);
 #endif
+
+          if(!lcd_draw_test_bars())
+          {
+            UART3_Printf("LCD: draw 5 bars FAIL\r\n");
+          }
+          else
+          {
+            UART3_Printf("LCD: bars RED GREEN BLUE WHITE BLACK shown\r\n");
+          }
+
+          lcd_run_bmp_test();
+          lcd_uart_fill_loop();
+        }
+      }
 
       ran = 1;
     }

@@ -1,0 +1,225 @@
+Pixel 565 8bit and serial interface code
+
+Void NV3041A-01 _BOE 4.3IPS G8.5 initial(void)
+{
+//VCI=3.3V
+//---------Reset LCD Driver  -------//
+LCD_RESET=1;
+Delayms(20);
+LCD_RESET=0;
+Delayms(200);
+LCD_RESET=1;
+Delayms(120);
+
+
+//NV3041A-01+BOE4.3IPS(GV043WQQ-N10-8QP0)480x272_16MCU_AN_V1.2 20240118
+//---------Start Initial Code ------//
+WriteComm(0xff);
+WriteData(0xa5);
+WriteComm(0xE7);//TE_output_en
+WriteData(0x10);
+WriteComm(0x35);//TE_ interface_en
+WriteData(0x01);
+WriteComm(0x3A);
+WriteData(0x01);//00---666//01--565
+WriteComm(0x40);
+WriteData(0x01);  //01:IPS/00:TN
+WriteComm(0x41);
+WriteData(0x03);//01--8bit//03--16bit
+WriteComm(0x55);
+WriteData(0x01);
+WriteComm(0x44);//VBP
+WriteData(0x15);//21
+WriteComm(0x45);//VFP
+WriteData(0x15);//21
+WriteComm(0x7d);//vdds_trim[2:0]
+WriteData(0x03);//2.07V
+WriteComm(0xc1);//avdd_clp_en avdd_clp[1:0] avcl_clp_en avcl_clp[1:0]
+WriteData(0xab);//6.74V/-5.16V
+WriteComm(0xc2);//vgh_clp_en vgl_clp[2:0]
+WriteData(0x17);
+WriteComm(0xc3);//vgl_clp_en vgl_clp[2:0]
+WriteData(0x10);//-10.951
+WriteComm(0xc6);//avdd_ratio_sel avcl_ratio_sel vgh_ratio_sel[1:0] vgl_ratio_sel[1:0]
+WriteData(0x3a);//35
+WriteComm(0xc7);//mv_clk_sel[1:0] avdd_clk_sel[1:0] avcl_clk_sel[1:0]
+WriteData(0x25); //2e
+WriteComm(0xc8);// VGL_CLK_sel
+WriteData(0x11);
+WriteComm(0x6f);// user_gvdd
+WriteData(0x2f);
+WriteComm(0x78);// user_gvcl
+WriteData(0x4b);
+//WriteComm(0x7a);// user_vgsp
+//WriteData(0x5f);
+//test
+WriteComm(0x7a);// user_vgsp
+WriteData(0x49);
+WriteComm(0xc9);
+WriteData(0x00);
+//gate_ed
+WriteComm(0x51);//gate_st_o[7:0]
+//WriteData(0x4b);
+WriteData(0x20);
+WriteComm(0x52);//gate_ed_o[7:0]
+WriteData(0x7c);
+WriteComm(0x53);//gate_st_e[7:0]
+//WriteData(0x45);
+WriteData(0x1c);
+WriteComm(0x54);//gate_ed_e[7:0]
+WriteData(0x77);
+////sorce old
+WriteComm(0x46);//fsm_hbp_o[5:0]
+WriteData(0x0a);
+WriteComm(0x47);//fsm_hfp_o[5:0]
+WriteData(0x2a);
+WriteComm(0x48);//fsm_hbp_e[5:0]
+WriteData(0x0a);
+WriteComm(0x49);//fsm_hfp_e[5:0]
+WriteData(0x1a);
+WriteComm(0x56);//src_ld_wd[1:0] src_ld_st[5:0]
+WriteData(0x43);
+WriteComm(0x57);//pn_cs_en src_cs_st[5:0]
+WriteData(0x42);
+WriteComm(0x58);//src_cs_p_wd[6:0]
+WriteData(0x3c);
+WriteComm(0x59);//src_cs_n_wd[6:0]
+WriteData(0x64);
+WriteComm(0x5a);//src_pchg_st_o[6:0]
+WriteData(0x41);
+WriteComm(0x5b);//src_pchg_wd_o[6:0]
+WriteData(0x3c);
+WriteComm(0x5c);//src_pchg_st_e[6:0]
+WriteData(0x02);
+WriteComm(0x5d);//src_pchg_wd_e[6:0]
+WriteData(0x3c);
+WriteComm(0x5e);//src_pol_sw[7:0]
+WriteData(0x1f);
+WriteComm(0x60);//src_op_st_o[7:0]
+WriteData(0x80);
+WriteComm(0x61);//src_op_st_e[7:0]
+WriteData(0x3f);
+WriteComm(0x62);//src_op_ed_o[9:8] src_op_ed_e[9:8]
+WriteData(0x21);
+WriteComm(0x63);//src_op_ed_o[7:0]
+WriteData(0x07);
+WriteComm(0x64);//src_op_ed_e[7:0]
+WriteData(0xe0);
+WriteComm(0x65);//chopper
+WriteData(0x01);//01-A2,02--A1
+//WriteComm(0x67);
+//WriteData(0x33);//01
+WriteComm(0xca); //avdd_mux_st_o[7:0]
+WriteData(0x20);
+WriteComm(0xcb); //avdd_mux_ed_o[7:0]
+WriteData(0x52);
+WriteComm(0xcc); //avdd_mux_st_e[7:0]
+WriteData(0x10);
+WriteComm(0xcD);//avdd_mux_ed_e[7:0]
+WriteData(0x42);
+WriteComm(0xD0); //avcl_mux_st_o[7:0]
+WriteData(0x20);
+WriteComm(0xD1);//avcl_mux_ed_o[7:0]
+WriteData(0x52);
+WriteComm(0xD2);//avcl_mux_st_e[7:0]
+WriteData(0x10);
+WriteComm(0xD3);//avcl_mux_ed_e[7:0]
+WriteData(0x42);
+WriteComm(0xD4);//vgh_mux_st[7:0]
+WriteData(0x0a);
+WriteComm(0xD5);//vgh_mux_ed[7:0]
+WriteData(0x32);
+WriteComm(0xe5);//DVDD_TRIM
+WriteData(0x05);//1.65  05
+WriteComm(0xe6);//ESD_CTRL
+WriteData(0x00);
+WriteComm(0x6e);//LVD_en
+WriteData(0x14);
+//gammma 01
+WriteComm(0x80);//gam_vrp0    63
+WriteData(0x04);
+WriteComm(0xA0);//gam_VRN0  63
+WriteData(0x00);
+WriteComm(0x81);//gam_vrp1    62
+WriteData(0x07);
+WriteComm(0xA1);//gam_VRN1  62-
+WriteData(0x05);
+WriteComm(0x82);//gam_vrp2     61
+WriteData(0x06);
+WriteComm(0xA2);//gam_VRN2   61-
+WriteData(0x04);
+WriteComm(0x83);//gam_vrp3     2
+WriteData(0x39);
+WriteComm(0xA3);//gam_VRN3   2-
+WriteData(0x39);
+WriteComm(0x84);//gam_vrp4     1
+WriteData(0x3a);
+WriteComm(0xA4);//gam_VRN4   1-
+WriteData(0x3a);
+WriteComm(0x85);//gam_vrp5     0
+WriteData(0x3f);//2a~39-0.43
+WriteComm(0xA5);//gam_VRN5   0-
+WriteData(0x3f);
+WriteComm(0x86);//gam_prp0     50
+WriteData(0x2c);//33
+WriteComm(0xA6);//gam_PRN0   50-
+WriteData(0x2a);//2a
+//WriteComm(0x87);//gam_prp1  14
+//WriteData(0x46);//2d
+//WriteComm(0xA7);//gam_PRN1 14-
+//WriteData(0x44);//2d
+WriteComm(0x87);//gam_prp1  14
+WriteData(0x43);//2d
+WriteComm(0xA7);//gam_PRN1 14-
+WriteData(0x47);//2d
+WriteComm(0x88);//gam_pkp0   59
+WriteData(0x08);//0b
+WriteComm(0xA8);//gam_PKN0  59-
+WriteData(0x08);//0b
+WriteComm(0x89);//gam_pkp1   57
+WriteData(0x0f);//14
+WriteComm(0xA9);//gam_PKN1  57-
+WriteData(0x0f);//14
+WriteComm(0x8a);//gam_pkp2   54
+WriteData(0x17);//1a
+WriteComm(0xAa);//gam_PKN2  54-
+WriteData(0x17);//1a
+WriteComm(0x8b);//gam_PKP3   44
+WriteData(0x10);
+WriteComm(0xAb);//gam_PKN3  44-
+WriteData(0x10);
+WriteComm(0x8c);//gam_PKP4   38
+WriteData(0x16);
+WriteComm(0xAc);//gam_PKN4  38-
+WriteData(0x16);
+WriteComm(0x8d);//gam_PKP5   32
+WriteData(0x14);
+WriteComm(0xAd);///gam_PKN5 32-
+WriteData(0x14);
+WriteComm(0x8e);//gam_PKP6    26
+WriteData(0x11);//16
+WriteComm(0xAe);//gam_PKN6   26-
+WriteData(0x11);//13
+WriteComm(0x8f);//gam_PKP7    20
+WriteData(0x14);//1c
+WriteComm(0xAf);//gam_PKN7   20-
+WriteData(0x14); //0a
+WriteComm(0x90);//gam_PKP8   10
+WriteData(0x06);
+WriteComm(0xB0);//gam_PKN8   10-
+WriteData(0x06);
+WriteComm(0x91);//gam_PKP9    6
+WriteData(0x0f);
+WriteComm(0xB1);//gam_PKN9   6-
+WriteData(0x0f);
+WriteComm(0x92);//gam_PKP10  4
+WriteData(0x16);
+WriteComm(0xB2);//gam_PKN10 4-
+WriteData(0x16);
+WriteComm(0xff);
+WriteData(0x00);
+WriteComm(0x11);
+Delay(200);
+WriteComm(0x29);
+Delay(120);
+}

@@ -4,27 +4,10 @@
 
 #define QSPI2_LCD_OPCODE_WRITE_CMD   0x02U
 #define QSPI2_LCD_OPCODE_READ_CMD    0x03U
-#define QSPI2_LCD_OPCODE_WRITE_COLOR 0x32U
+#define QSPI2_LCD_OPCODE_WRITE_RAM32 0x32U
 
-static qspi_operate_mode_type qspi2_lcd_bus_opmode = QSPI_OPERATE_MODE_114;
-static int qspi2_lcd_bus_last_error = 0;
 static qspi2_lcd_bus_diag_t qspi2_lcd_bus_diag_after_kick;
 static qspi2_lcd_bus_diag_t qspi2_lcd_bus_diag_before_exit;
-
-void qspi2_lcd_bus_opmode_set(qspi_operate_mode_type opmode)
-{
-  qspi2_lcd_bus_opmode = opmode;
-}
-
-qspi_operate_mode_type qspi2_lcd_bus_opmode_get(void)
-{
-  return qspi2_lcd_bus_opmode;
-}
-
-int qspi2_lcd_bus_last_error_get(void)
-{
-  return qspi2_lcd_bus_last_error;
-}
 
 void qspi2_lcd_bus_diag_capture(qspi2_lcd_bus_diag_t *out)
 {
@@ -159,10 +142,10 @@ int qspi2_lcd_bus_write(uint8_t cmd, const uint8_t *data, uint32_t len)
   qspi_cmd_type qcmd;
   uint32_t i;
   uint32_t addr;
+  uint32_t actual_len;
+  uint8_t pad;
 
-  qspi2_lcd_bus_last_error = 0;
-  qspi_xip_enable(QSPI2, FALSE);
-
+  /* NV3041A Quad-SPI uses a 24-bit address field formatted as {0x00, CMD, 0x00}. */
   addr = ((uint32_t)cmd) << 8;
 
   qcmd.pe_mode_enable = FALSE;
@@ -171,29 +154,33 @@ int qspi2_lcd_bus_write(uint8_t cmd, const uint8_t *data, uint32_t len)
   qcmd.instruction_length = QSPI_CMD_INSLEN_1_BYTE;
   qcmd.address_code = addr;
   qcmd.address_length = QSPI_CMD_ADRLEN_3_BYTE;
-  qcmd.data_counter = len;
+  /* Some NV3041A command-only writes do not complete cleanly with a zero
+     data-count on this controller, so send one pad byte while keeping the
+     same command framing. */
+  actual_len = (len == 0U) ? 1U : len;
+  pad = 0x00U;
+
+  qcmd.data_counter = actual_len;
   qcmd.second_dummy_cycle_num = 0;
-  qcmd.operation_mode = qspi2_lcd_bus_opmode;
+  qcmd.operation_mode = QSPI_OPERATE_MODE_111;
   qcmd.read_status_config = QSPI_RSTSC_SW_ONCE;
   qcmd.read_status_enable = FALSE;
-  qcmd.write_data_enable = (len != 0U) ? TRUE : FALSE;
+  qcmd.write_data_enable = TRUE;
 
   qspi_flag_clear(QSPI2, QSPI_CMDSTS_FLAG);
   qspi_cmd_operation_kick(QSPI2, &qcmd);
 
-  for(i = 0; i < len; i++)
+  for(i = 0; i < actual_len; i++)
   {
     if(!qspi2_wait_txfifo_ready(QSPI2_LCD_BUS_TIMEOUT))
     {
-      qspi2_lcd_bus_last_error = 1;
       return 0;
     }
-    qspi_byte_write(QSPI2, data[i]);
+    qspi_byte_write(QSPI2, (len != 0U) ? data[i] : pad);
   }
 
   if(!qspi2_wait_cmd_done(QSPI2_LCD_BUS_TIMEOUT))
   {
-    qspi2_lcd_bus_last_error = 2;
     return 0;
   }
 
@@ -206,14 +193,12 @@ int qspi2_lcd_bus_read(uint8_t cmd, uint8_t *data, uint32_t len, uint8_t dummy_c
   uint32_t i;
   uint32_t addr;
 
-  qspi2_lcd_bus_last_error = 0;
   if((data == 0) && (len != 0U))
   {
     return 0;
   }
 
-  qspi_xip_enable(QSPI2, FALSE);
-
+  /* NV3041A Quad-SPI uses a 24-bit address field formatted as {0x00, CMD, 0x00}. */
   addr = ((uint32_t)cmd) << 8;
 
   qcmd.pe_mode_enable = FALSE;
@@ -224,8 +209,8 @@ int qspi2_lcd_bus_read(uint8_t cmd, uint8_t *data, uint32_t len, uint8_t dummy_c
   qcmd.address_length = QSPI_CMD_ADRLEN_3_BYTE;
   qcmd.data_counter = len;
   qcmd.second_dummy_cycle_num = dummy_cycles;
-  qcmd.operation_mode = qspi2_lcd_bus_opmode;
-  qcmd.read_status_config = QSPI_RSTSC_HW_AUTO;
+  qcmd.operation_mode = QSPI_OPERATE_MODE_111;
+  qcmd.read_status_config = QSPI_RSTSC_SW_ONCE;
   qcmd.read_status_enable = FALSE;
   qcmd.write_data_enable = FALSE;
 
@@ -236,7 +221,6 @@ int qspi2_lcd_bus_read(uint8_t cmd, uint8_t *data, uint32_t len, uint8_t dummy_c
   {
     if(!qspi2_wait_rxfifo_ready(QSPI2_LCD_BUS_TIMEOUT))
     {
-      qspi2_lcd_bus_last_error = 3;
       return 0;
     }
     data[i] = qspi_byte_read(QSPI2);
@@ -244,7 +228,6 @@ int qspi2_lcd_bus_read(uint8_t cmd, uint8_t *data, uint32_t len, uint8_t dummy_c
 
   if(!qspi2_wait_cmd_done(QSPI2_LCD_BUS_TIMEOUT))
   {
-    qspi2_lcd_bus_last_error = 2;
     return 0;
   }
 
@@ -257,15 +240,12 @@ int qspi2_lcd_bus_read_03h(uint8_t addr, uint8_t *data, uint32_t len, uint8_t du
   uint32_t i;
   uint32_t addr24;
 
-  qspi2_lcd_bus_last_error = 0;
   qspi2_lcd_bus_diag_capture(&qspi2_lcd_bus_diag_after_kick);
   qspi2_lcd_bus_diag_capture(&qspi2_lcd_bus_diag_before_exit);
   if((data == 0) && (len != 0U))
   {
     return 0;
   }
-
-  qspi_xip_enable(QSPI2, FALSE);
 
   addr24 = ((uint32_t)addr) << 8;
 
@@ -277,7 +257,7 @@ int qspi2_lcd_bus_read_03h(uint8_t addr, uint8_t *data, uint32_t len, uint8_t du
   qcmd.address_length = QSPI_CMD_ADRLEN_3_BYTE;
   qcmd.data_counter = len;
   qcmd.second_dummy_cycle_num = dummy_cycles;
-  qcmd.operation_mode = qspi2_lcd_bus_opmode;
+  qcmd.operation_mode = QSPI_OPERATE_MODE_111;
   qcmd.read_status_config = QSPI_RSTSC_HW_AUTO;
   qcmd.read_status_enable = FALSE;
   qcmd.write_data_enable = FALSE;
@@ -290,7 +270,6 @@ int qspi2_lcd_bus_read_03h(uint8_t addr, uint8_t *data, uint32_t len, uint8_t du
   {
     if(!qspi2_wait_rxfifo_ready(QSPI2_LCD_BUS_TIMEOUT))
     {
-      qspi2_lcd_bus_last_error = 3;
       qspi2_lcd_bus_diag_capture(&qspi2_lcd_bus_diag_before_exit);
       return 0;
     }
@@ -299,7 +278,6 @@ int qspi2_lcd_bus_read_03h(uint8_t addr, uint8_t *data, uint32_t len, uint8_t du
 
   if(!qspi2_wait_cmd_done(QSPI2_LCD_BUS_TIMEOUT))
   {
-    qspi2_lcd_bus_last_error = 2;
     qspi2_lcd_bus_diag_capture(&qspi2_lcd_bus_diag_before_exit);
     return 0;
   }
@@ -308,32 +286,30 @@ int qspi2_lcd_bus_read_03h(uint8_t addr, uint8_t *data, uint32_t len, uint8_t du
   return 1;
 }
 
-int qspi2_lcd_bus_write_pixels_rgb565(uint8_t cmd, const uint16_t *pixels, uint32_t pixel_count)
+int qspi2_lcd_bus_write_pixels_rgb565(const uint16_t *pixels, uint32_t pixel_count)
 {
   qspi_cmd_type qcmd;
   uint32_t i;
   uint32_t addr;
 
-  qspi2_lcd_bus_last_error = 0;
   if((pixels == 0) && (pixel_count != 0U))
   {
     return 0;
   }
 
-  qspi_xip_enable(QSPI2, FALSE);
-
-  addr = ((uint32_t)cmd) << 8;
+  /* NV3041A RAM write: use 32h with command/address on IO0 and pixel data on 4 lanes. */
+  addr = ((uint32_t)0x2CU) << 8;
 
   qcmd.pe_mode_enable = FALSE;
   qcmd.pe_mode_operate_code = 0;
-  qcmd.instruction_code = QSPI2_LCD_OPCODE_WRITE_COLOR;
+  qcmd.instruction_code = QSPI2_LCD_OPCODE_WRITE_RAM32;
   qcmd.instruction_length = QSPI_CMD_INSLEN_1_BYTE;
   qcmd.address_code = addr;
   qcmd.address_length = QSPI_CMD_ADRLEN_3_BYTE;
   qcmd.data_counter = pixel_count * 2U;
   qcmd.second_dummy_cycle_num = 0;
-  qcmd.operation_mode = qspi2_lcd_bus_opmode;
-  qcmd.read_status_config = QSPI_RSTSC_HW_AUTO;
+  qcmd.operation_mode = QSPI_OPERATE_MODE_114;
+  qcmd.read_status_config = QSPI_RSTSC_SW_ONCE;
   qcmd.read_status_enable = FALSE;
   qcmd.write_data_enable = (pixel_count != 0U) ? TRUE : FALSE;
 
@@ -348,14 +324,12 @@ int qspi2_lcd_bus_write_pixels_rgb565(uint8_t cmd, const uint16_t *pixels, uint3
 
     if(!qspi2_wait_txfifo_ready(QSPI2_LCD_BUS_TIMEOUT))
     {
-      qspi2_lcd_bus_last_error = 1;
       return 0;
     }
     qspi_byte_write(QSPI2, hi);
 
     if(!qspi2_wait_txfifo_ready(QSPI2_LCD_BUS_TIMEOUT))
     {
-      qspi2_lcd_bus_last_error = 1;
       return 0;
     }
     qspi_byte_write(QSPI2, lo);
@@ -363,7 +337,6 @@ int qspi2_lcd_bus_write_pixels_rgb565(uint8_t cmd, const uint16_t *pixels, uint3
 
   if(!qspi2_wait_cmd_done(QSPI2_LCD_BUS_TIMEOUT))
   {
-    qspi2_lcd_bus_last_error = 2;
     return 0;
   }
 

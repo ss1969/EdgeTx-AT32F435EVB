@@ -46,7 +46,9 @@
             <ModeSub name="QSPI_State" value="TRUE"/>
         </Mode>
         <Parameters>
-            <ParametersSub name="ClockFrequency" value="36000000"/>
+            <ParametersSub name="ClkDivision" value="QSPI_CLK_DIV_6"/>
+            <ParametersSub name="ClockFrequency" value="48000000"/>
+            <ParametersSub name="PortSwitch" value="QSPI_PORT_CMD"/>
         </Parameters>
     </QSPI2>
     <SPI1>
@@ -119,6 +121,18 @@
             <ParametersSub name="SyncRequestCount" value="1"/>
             <ParametersSub name="RequestCount" value="1"/>
         </QSPI1>
+        <QSPI2>
+            <ParametersSub name="Instance" value="EDMA_Stream2"/>
+            <ParametersSub name="Direction" value="EDMA_DIR_MEMORY_TO_PERIPHERAL"/>
+            <ParametersSub name="FIFOMode" value="TRUE"/>
+            <ParametersSub name="FIFOThreshold" value="EDMA_FIFO_THRESHOLD_HALF"/>
+            <ParametersSub name="SourceStride" value="0"/>
+            <ParametersSub name="DestinationStride" value="0"/>
+            <ParametersSub name="XAxisCount" value="0"/>
+            <ParametersSub name="YAxisCount" value="0"/>
+            <ParametersSub name="SyncRequestCount" value="1"/>
+            <ParametersSub name="RequestCount" value="1"/>
+        </QSPI2>
     </EDMA>
     <NVIC>
         <SysTick_Handler>1;15;0;0;0</SysTick_Handler>
@@ -126,6 +140,7 @@
         <CRM_IRQHandler>0;0;0;0;0</CRM_IRQHandler>
         <EXINT0_IRQHandler>0;0;0;0;0</EXINT0_IRQHandler>
         <EDMA_Stream1_IRQHandler>0;0;0;0;0</EDMA_Stream1_IRQHandler>
+        <EDMA_Stream2_IRQHandler>1;0;0;0;0</EDMA_Stream2_IRQHandler>
         <SPI1_IRQHandler>0;0;0;0;0</SPI1_IRQHandler>
         <USART1_IRQHandler>0;0;0;0;0</USART1_IRQHandler>
         <USART2_IRQHandler>0;0;0;0;0</USART2_IRQHandler>
@@ -199,15 +214,15 @@
         <PinSub pinname="PH1/HEXT_OUT" signalname="CRM_HEXT_OUT" signaltype="2"/>
         <PinSub pinname="PC3" signalname="QSPI2_IO1" signaltype="2"/>
         <PinSub pinname="PA0" signalname="EXINT0" signaltype="3"/>
-        <PinSub pinname="PA3" signalname="QSPI2_IO3" signaltype="2"/>
         <PinSub pinname="PA4" signalname="SPI1_CS" signaltype="2"/>
-        <PinSub pinname="PA5" signalname="QSPI2_IO2" signaltype="2"/>
         <PinSub pinname="PA7" signalname="GPIO_Output" signaltype="3"/>
         <PinSub pinname="PC4" signalname="USART3_TX" signaltype="2"/>
         <PinSub pinname="PC5" signalname="USART3_RX" signaltype="2"/>
         <PinSub pinname="PB0" signalname="QSPI2_IO0" signaltype="2"/>
         <PinSub pinname="PB1" signalname="QSPI2_SCK" signaltype="2"/>
         <PinSub pinname="PF11" signalname="GPIO_Input" signaltype="3"/>
+        <PinSub pinname="PE9" signalname="QSPI2_IO2" signaltype="2"/>
+        <PinSub pinname="PE10" signalname="QSPI2_IO3" signaltype="2"/>
         <PinSub pinname="PE12" signalname="GPIO_Output" signaltype="3"/>
         <PinSub pinname="PE13" signalname="SPI1_SCK" signaltype="2"/>
         <PinSub pinname="PE15" signalname="SPI1_MOSI" signaltype="2"/>
@@ -230,7 +245,7 @@
     </PINInfo>
     <ProjectInfomation>
         <ProjectName>AT32F435ZMT7EV</ProjectName>
-        <ProjectLocation>D:/Projects/EdgeTX</ProjectLocation>
+        <ProjectLocation>D:/Projects/EdgeTX/AT32F435ZMT7EV - 副本</ProjectLocation>
         <ToolchainIDE>MDK_V5</ToolchainIDE>
         <ARMCompiler>0</ARMCompiler>
         <BackupCode>false</BackupCode>

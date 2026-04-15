@@ -1,13 +1,49 @@
-#include "qspi2_lcd_bus.h"
+#include "qspi2_lcd_bus_priv.h"
+#include "wk_edma.h"
 
 #define QSPI2_LCD_BUS_TIMEOUT 2000000U
 
 #define QSPI2_LCD_OPCODE_WRITE_CMD   0x02U
 #define QSPI2_LCD_OPCODE_READ_CMD    0x03U
 #define QSPI2_LCD_OPCODE_WRITE_RAM32 0x32U
+#define QSPI2_LCD_EDMA_CHUNK_PIXELS  2048U
 
 static qspi2_lcd_bus_diag_t qspi2_lcd_bus_diag_after_kick;
 static qspi2_lcd_bus_diag_t qspi2_lcd_bus_diag_before_exit;
+static uint8_t qspi2_lcd_edma_tx_buf[QSPI2_LCD_EDMA_CHUNK_PIXELS * 2U];
+
+static void qspi2_edma_clear_stream2_flags(void)
+{
+  edma_flag_clear(EDMA_FERR2_FLAG);
+  edma_flag_clear(EDMA_DMERR2_FLAG);
+  edma_flag_clear(EDMA_DTERR2_FLAG);
+  edma_flag_clear(EDMA_HDT2_FLAG);
+  edma_flag_clear(EDMA_FDT2_FLAG);
+}
+
+static int qspi2_edma_wait_stream2_done(uint32_t timeout)
+{
+  while(edma_flag_get(EDMA_FDT2_FLAG) == RESET)
+  {
+    if(edma_flag_get(EDMA_FERR2_FLAG) != RESET)
+    {
+      return 0;
+    }
+    if(edma_flag_get(EDMA_DMERR2_FLAG) != RESET)
+    {
+      return 0;
+    }
+    if(edma_flag_get(EDMA_DTERR2_FLAG) != RESET)
+    {
+      return 0;
+    }
+    if(timeout-- == 0U)
+    {
+      return 0;
+    }
+  }
+  return 1;
+}
 
 void qspi2_lcd_bus_diag_capture(qspi2_lcd_bus_diag_t *out)
 {
@@ -198,7 +234,6 @@ int qspi2_lcd_bus_read(uint8_t cmd, uint8_t *data, uint32_t len, uint8_t dummy_c
     return 0;
   }
 
-  /* NV3041A Quad-SPI uses a 24-bit address field formatted as {0x00, CMD, 0x00}. */
   addr = ((uint32_t)cmd) << 8;
 
   qcmd.pe_mode_enable = FALSE;
@@ -230,67 +265,16 @@ int qspi2_lcd_bus_read(uint8_t cmd, uint8_t *data, uint32_t len, uint8_t dummy_c
   {
     return 0;
   }
-
-  return 1;
-}
-
-int qspi2_lcd_bus_read_03h(uint8_t addr, uint8_t *data, uint32_t len, uint8_t dummy_cycles)
-{
-  qspi_cmd_type qcmd;
-  uint32_t i;
-  uint32_t addr24;
-
-  qspi2_lcd_bus_diag_capture(&qspi2_lcd_bus_diag_after_kick);
-  qspi2_lcd_bus_diag_capture(&qspi2_lcd_bus_diag_before_exit);
-  if((data == 0) && (len != 0U))
-  {
-    return 0;
-  }
-
-  addr24 = ((uint32_t)addr) << 8;
-
-  qcmd.pe_mode_enable = FALSE;
-  qcmd.pe_mode_operate_code = 0;
-  qcmd.instruction_code = QSPI2_LCD_OPCODE_READ_CMD;
-  qcmd.instruction_length = QSPI_CMD_INSLEN_1_BYTE;
-  qcmd.address_code = addr24;
-  qcmd.address_length = QSPI_CMD_ADRLEN_3_BYTE;
-  qcmd.data_counter = len;
-  qcmd.second_dummy_cycle_num = dummy_cycles;
-  qcmd.operation_mode = QSPI_OPERATE_MODE_111;
-  qcmd.read_status_config = QSPI_RSTSC_HW_AUTO;
-  qcmd.read_status_enable = FALSE;
-  qcmd.write_data_enable = FALSE;
-
-  qspi_flag_clear(QSPI2, QSPI_CMDSTS_FLAG);
-  qspi_cmd_operation_kick(QSPI2, &qcmd);
-  qspi2_lcd_bus_diag_capture(&qspi2_lcd_bus_diag_after_kick);
-
-  for(i = 0; i < len; i++)
-  {
-    if(!qspi2_wait_rxfifo_ready(QSPI2_LCD_BUS_TIMEOUT))
-    {
-      qspi2_lcd_bus_diag_capture(&qspi2_lcd_bus_diag_before_exit);
-      return 0;
-    }
-    data[i] = qspi_byte_read(QSPI2);
-  }
-
-  if(!qspi2_wait_cmd_done(QSPI2_LCD_BUS_TIMEOUT))
-  {
-    qspi2_lcd_bus_diag_capture(&qspi2_lcd_bus_diag_before_exit);
-    return 0;
-  }
-
-  qspi2_lcd_bus_diag_capture(&qspi2_lcd_bus_diag_before_exit);
+  
   return 1;
 }
 
 int qspi2_lcd_bus_write_pixels_rgb565(const uint16_t *pixels, uint32_t pixel_count)
 {
   qspi_cmd_type qcmd;
-  uint32_t i;
   uint32_t addr;
+  uint32_t remaining_pixels;
+  const uint16_t *src;
 
   if((pixels == 0) && (pixel_count != 0U))
   {
@@ -299,6 +283,8 @@ int qspi2_lcd_bus_write_pixels_rgb565(const uint16_t *pixels, uint32_t pixel_cou
 
   /* NV3041A RAM write: use 32h with command/address on IO0 and pixel data on 4 lanes. */
   addr = ((uint32_t)0x2CU) << 8;
+  remaining_pixels = pixel_count;
+  src = pixels;
 
   qcmd.pe_mode_enable = FALSE;
   qcmd.pe_mode_operate_code = 0;
@@ -313,26 +299,56 @@ int qspi2_lcd_bus_write_pixels_rgb565(const uint16_t *pixels, uint32_t pixel_cou
   qcmd.read_status_enable = FALSE;
   qcmd.write_data_enable = (pixel_count != 0U) ? TRUE : FALSE;
 
+  if(pixel_count != 0U)
+  {
+    qspi_dma_enable(QSPI2, TRUE);
+  }
+
   qspi_flag_clear(QSPI2, QSPI_CMDSTS_FLAG);
   qspi_cmd_operation_kick(QSPI2, &qcmd);
 
-  for(i = 0; i < pixel_count; i++)
+  if(pixel_count != 0U)
   {
-    uint16_t px = pixels[i];
-    uint8_t hi = (uint8_t)(px >> 8);
-    uint8_t lo = (uint8_t)(px & 0xFFU);
-
-    if(!qspi2_wait_txfifo_ready(QSPI2_LCD_BUS_TIMEOUT))
+    while(remaining_pixels != 0U)
     {
-      return 0;
-    }
-    qspi_byte_write(QSPI2, hi);
+      uint32_t chunk_pixels;
+      uint32_t chunk_bytes;
+      uint32_t i;
 
-    if(!qspi2_wait_txfifo_ready(QSPI2_LCD_BUS_TIMEOUT))
-    {
-      return 0;
+      chunk_pixels = (remaining_pixels > QSPI2_LCD_EDMA_CHUNK_PIXELS) ? QSPI2_LCD_EDMA_CHUNK_PIXELS : remaining_pixels;
+      chunk_bytes = chunk_pixels * 2U;
+
+      for(i = 0; i < chunk_pixels; i++)
+      {
+        uint16_t px = src[i];
+        qspi2_lcd_edma_tx_buf[i * 2U] = (uint8_t)(px >> 8);
+        qspi2_lcd_edma_tx_buf[i * 2U + 1U] = (uint8_t)(px & 0xFFU);
+      }
+
+      edma_stream_enable(EDMA_STREAM2, FALSE);
+      qspi2_edma_clear_stream2_flags();
+      wk_edma_stream_config(EDMA_STREAM2,
+                            (uint32_t)&QSPI2->dt_u8,
+                            (uint32_t)qspi2_lcd_edma_tx_buf,
+                            (uint16_t)chunk_bytes);
+
+      edma_stream_enable(EDMA_STREAM2, TRUE);
+      if(!qspi2_edma_wait_stream2_done(QSPI2_LCD_BUS_TIMEOUT))
+      {
+        edma_stream_enable(EDMA_STREAM2, FALSE);
+        qspi_dma_enable(QSPI2, FALSE);
+        qspi2_edma_clear_stream2_flags();
+        return 0;
+      }
+
+      edma_stream_enable(EDMA_STREAM2, FALSE);
+      qspi2_edma_clear_stream2_flags();
+
+      src += chunk_pixels;
+      remaining_pixels -= chunk_pixels;
     }
-    qspi_byte_write(QSPI2, lo);
+
+    qspi_dma_enable(QSPI2, FALSE);
   }
 
   if(!qspi2_wait_cmd_done(QSPI2_LCD_BUS_TIMEOUT))

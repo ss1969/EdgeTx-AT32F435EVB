@@ -140,19 +140,8 @@ static void aps_edma_clear_stream1_flags(void)
   edma_flag_clear(EDMA_FDT1_FLAG);
 }
 
-static void aps_edma_clear_stream2_flags(void)
-{
-  edma_flag_clear(EDMA_FERR2_FLAG);
-  edma_flag_clear(EDMA_DMERR2_FLAG);
-  edma_flag_clear(EDMA_DTERR2_FLAG);
-  edma_flag_clear(EDMA_HDT2_FLAG);
-  edma_flag_clear(EDMA_FDT2_FLAG);
-}
-
 static void aps_edma_init_once(void)
 {
-  edma_init_type edma_init_struct;
-
   if(aps6404l_edma_inited)
   {
     return;
@@ -160,12 +149,21 @@ static void aps_edma_init_once(void)
 
   edmamux_enable(TRUE);
   edmamux_init(EDMAMUX_CHANNEL1, EDMAMUX_DMAREQ_ID_QSPI1);
-  edmamux_init(EDMAMUX_CHANNEL2, EDMAMUX_DMAREQ_ID_QSPI1);
+  edma_stream_enable(EDMA_STREAM1, FALSE);
+  aps_edma_clear_stream1_flags();
 
+  aps6404l_edma_inited = 1;
+}
+
+static void aps_edma_config_stream1(edma_dir_type direction)
+{
+  edma_init_type edma_init_struct;
+
+  edma_stream_enable(EDMA_STREAM1, FALSE);
   edma_reset(EDMA_STREAM1);
-  edma_reset(EDMA_STREAM2);
 
   edma_default_para_init(&edma_init_struct);
+  edma_init_struct.direction = direction;
   edma_init_struct.peripheral_data_width = EDMA_PERIPHERAL_DATA_WIDTH_WORD;
   edma_init_struct.peripheral_inc_enable = FALSE;
   edma_init_struct.memory_data_width = EDMA_MEMORY_DATA_WIDTH_WORD;
@@ -178,19 +176,9 @@ static void aps_edma_init_once(void)
   edma_init_struct.loop_mode_enable = FALSE;
   edma_init_struct.buffer_size = 0;
   edma_init_struct.peripheral_base_addr = (uint32_t)&QSPI1->dt;
-
-  edma_init_struct.direction = EDMA_DIR_MEMORY_TO_PERIPHERAL;
   edma_init(EDMA_STREAM1, &edma_init_struct);
 
-  edma_init_struct.direction = EDMA_DIR_PERIPHERAL_TO_MEMORY;
-  edma_init(EDMA_STREAM2, &edma_init_struct);
-
-  edma_stream_enable(EDMA_STREAM1, FALSE);
-  edma_stream_enable(EDMA_STREAM2, FALSE);
   aps_edma_clear_stream1_flags();
-  aps_edma_clear_stream2_flags();
-
-  aps6404l_edma_inited = 1;
 }
 
 static int aps_edma_wait_fdt(uint32_t fdt_flag, uint32_t ferr_flag, uint32_t dmerr_flag, uint32_t dterr_flag, uint32_t timeout)
@@ -629,6 +617,7 @@ int PSRAM_EDMA_Write(unsigned int address, const unsigned char *pBuffer, int nLe
   }
 
   aps_edma_init_once();
+  aps_edma_config_stream1(EDMA_DIR_MEMORY_TO_PERIPHERAL);
 
   qspi_dma_enable(QSPI1, FALSE);
 
@@ -666,8 +655,6 @@ int PSRAM_EDMA_Write(unsigned int address, const unsigned char *pBuffer, int nLe
   cmd.read_status_enable = FALSE;
   cmd.write_data_enable = TRUE;
 
-  edma_stream_enable(EDMA_STREAM1, FALSE);
-  aps_edma_clear_stream1_flags();
   EDMA_STREAM1->dtcnt = (uint16_t)word_count;
   EDMA_STREAM1->paddr = (uint32_t)&QSPI1->dt;
   EDMA_STREAM1->m0addr = (uint32_t)pBuffer;
@@ -784,6 +771,7 @@ int PSRAM_EDMA_Read(unsigned int address, unsigned char *pBuffer, int nLength)
   }
 
   aps_edma_init_once();
+  aps_edma_config_stream1(EDMA_DIR_PERIPHERAL_TO_MEMORY);
 
   qspi_dma_enable(QSPI1, FALSE);
 
@@ -821,27 +809,25 @@ int PSRAM_EDMA_Read(unsigned int address, unsigned char *pBuffer, int nLength)
   cmd.read_status_enable = FALSE;
   cmd.write_data_enable = FALSE;
 
-  edma_stream_enable(EDMA_STREAM2, FALSE);
-  aps_edma_clear_stream2_flags();
-  EDMA_STREAM2->dtcnt = (uint16_t)word_count;
-  EDMA_STREAM2->paddr = (uint32_t)&QSPI1->dt;
-  EDMA_STREAM2->m0addr = (uint32_t)pBuffer;
+  EDMA_STREAM1->dtcnt = (uint16_t)word_count;
+  EDMA_STREAM1->paddr = (uint32_t)&QSPI1->dt;
+  EDMA_STREAM1->m0addr = (uint32_t)pBuffer;
 
   qspi_dma_enable(QSPI1, TRUE);
   qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
   qspi_cmd_operation_kick(QSPI1, &cmd);
 
-  edma_stream_enable(EDMA_STREAM2, TRUE);
-  if(!aps_edma_wait_fdt(EDMA_FDT2_FLAG, EDMA_FERR2_FLAG, EDMA_DMERR2_FLAG, EDMA_DTERR2_FLAG, APS6404L_HW_TIMEOUT))
+  edma_stream_enable(EDMA_STREAM1, TRUE);
+  if(!aps_edma_wait_fdt(EDMA_FDT1_FLAG, EDMA_FERR1_FLAG, EDMA_DMERR1_FLAG, EDMA_DTERR1_FLAG, APS6404L_HW_TIMEOUT))
   {
-    edma_stream_enable(EDMA_STREAM2, FALSE);
+    edma_stream_enable(EDMA_STREAM1, FALSE);
     qspi_dma_enable(QSPI1, FALSE);
     aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
     return 0;
   }
 
-  edma_stream_enable(EDMA_STREAM2, FALSE);
-  aps_edma_clear_stream2_flags();
+  edma_stream_enable(EDMA_STREAM1, FALSE);
+  aps_edma_clear_stream1_flags();
 
   if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
   {

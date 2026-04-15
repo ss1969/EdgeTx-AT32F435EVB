@@ -67,6 +67,7 @@ void PendSV_Handler(void);
 
 void SysTick_Handler(void);
 
+void EDMA_Stream2_IRQHandler(void);
 void DMA1_Channel1_IRQHandler(void);
 
 /* add user code begin exported functions */

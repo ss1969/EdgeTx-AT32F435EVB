@@ -69,6 +69,43 @@ void wk_edma_stream1_init(void)
 }
 
 /**
+  * @brief  init edma stream1 for "qspi2"
+  * @param  none
+  * @retval none
+  */
+void wk_edma_stream2_init(void)
+{
+  /* add user code begin edma_stream2 0 */
+
+  /* add user code end edma_stream2 0 */
+
+  edma_init_type edma_init_struct;
+
+  /* edma stream2 configuration */
+  edma_default_para_init(&edma_init_struct);
+  edma_init_struct.direction = EDMA_DIR_MEMORY_TO_PERIPHERAL;
+  edma_init_struct.peripheral_data_width = EDMA_PERIPHERAL_DATA_WIDTH_BYTE;
+  edma_init_struct.peripheral_inc_enable = FALSE;
+  edma_init_struct.memory_data_width = EDMA_MEMORY_DATA_WIDTH_BYTE;
+  edma_init_struct.memory_inc_enable = TRUE;
+  edma_init_struct.fifo_mode_enable = TRUE;
+  edma_init_struct.fifo_threshold = EDMA_FIFO_THRESHOLD_HALF;
+  edma_init_struct.peripheral_burst_mode = EDMA_PERIPHERAL_SINGLE;
+  edma_init_struct.memory_burst_mode = EDMA_MEMORY_SINGLE;
+  edma_init_struct.priority = EDMA_PRIORITY_HIGH;
+  edma_init_struct.loop_mode_enable = FALSE;
+  edma_init(EDMA_STREAM2, &edma_init_struct);
+
+  /* edmamux init */
+  edmamux_enable(TRUE);
+  edmamux_init(EDMAMUX_CHANNEL2, EDMAMUX_DMAREQ_ID_QSPI2);
+
+  /* add user code begin edma_stream2 1 */
+
+  /* add user code end edma_stream2 1 */
+}
+
+/**
   * @brief  config edma stream transfer parameter
   * @param  edma_streamx: EDMA_STREAMx
   * @param  peripheral_base_addr: peripheral address.

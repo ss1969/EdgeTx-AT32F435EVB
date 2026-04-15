@@ -198,7 +198,7 @@ void wk_qspi2_init(void)
  /* configure param */
   qspi_xip_enable(QSPI2, FALSE);
 
-  qspi_clk_division_set(QSPI2, QSPI_CLK_DIV_8);
+  qspi_clk_division_set(QSPI2, QSPI_CLK_DIV_6);
   
   qspi_sck_mode_set(QSPI2, QSPI_SCK_MODE_0);
 
@@ -210,11 +210,11 @@ void wk_qspi2_init(void)
 
   qspi_dma_tx_threshold_set(QSPI2, QSPI_DMA_FIFO_THOD_WORD08);
 
+  /* add user code begin qspi2_init 2 */
+
   /* Command-port LCD use still depends on a sane address space window.
      Keep a large 24-bit span so long GRAM writes do not hit a tiny default. */
   QSPI2->fsize = 0x00FFFFFFU;
-
-  /* add user code begin qspi2_init 2 */
 
   /* add user code end qspi2_init 2 */
 }

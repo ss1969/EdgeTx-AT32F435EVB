@@ -1,3 +1,4 @@
+#include "txw430038b0_nv3041a_01_panel.h"
 #include "txw430038b0_nv3041a_01_spi.h"
 
 #include "wk_system.h"
@@ -17,6 +18,32 @@ typedef struct
   uint8_t data_bytes;
   uint16_t delay_ms;
 } nv3041a01_init_cmd_t;
+
+static int txw430038b0_nv3041a_01_write_rect_contiguous(const uint16_t *pixels,
+                                                        uint16_t x0,
+                                                        uint16_t y0,
+                                                        uint16_t width,
+                                                        uint16_t height)
+{
+  uint32_t pixel_count;
+
+  if((pixels == 0) || (width == 0U) || (height == 0U))
+  {
+    return 0;
+  }
+
+  pixel_count = (uint32_t)width * (uint32_t)height;
+
+  if(!txw430038b0_nv3041a_01_set_window(x0,
+                                        y0,
+                                        (uint16_t)(x0 + width - 1U),
+                                        (uint16_t)(y0 + height - 1U)))
+  {
+    return 0;
+  }
+
+  return txw430038b0_nv3041a_01_write_pixels_rgb565(pixels, pixel_count);
+}
 
 static void txw430038b0_vendor_reset_sequence(void)
 {
@@ -271,6 +298,7 @@ void txw430038b0_nv3041a_01_spi_setWindow(coord_t x, coord_t y, coord_t w, coord
 void txw430038b0_nv3041a_01_spi_drawBitmap(BitmapBuffer *dc, coord_t x, coord_t y)
 {
   const uint16_t *src;
+  const uint16_t *block;
   int32_t src_w;
   int32_t src_h;
   int32_t dst_x;
@@ -334,11 +362,24 @@ void txw430038b0_nv3041a_01_spi_drawBitmap(BitmapBuffer *dc, coord_t x, coord_t 
   }
 
   src = (const uint16_t *)(void *)dc->data;
+  block = &src[src_y0 * src_w + src_x0];
+
+  /* Fast path: when the clipped bitmap region is still a contiguous block in
+     source memory, open the target window once and stream all pixels. */
+  if((src_x0 == 0) && (draw_w == src_w))
+  {
+    (void)txw430038b0_nv3041a_01_write_rect_contiguous(block,
+                                                       (uint16_t)draw_x0,
+                                                       (uint16_t)draw_y0,
+                                                       (uint16_t)draw_w,
+                                                       (uint16_t)draw_h);
+    return;
+  }
 
   for(row = 0; row < draw_h; row++)
   {
     int32_t y_line = draw_y0 + row;
-    const uint16_t *line = &src[(src_y0 + row) * src_w + src_x0];
+    const uint16_t *line = &block[row * src_w];
 
     if(!txw430038b0_nv3041a_01_set_window((uint16_t)draw_x0,
                                           (uint16_t)y_line,

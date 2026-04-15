@@ -40,9 +40,10 @@
 /* private includes ----------------------------------------------------------*/
 /* add user code begin private includes */
 #include "aps6404l.h"
+#include "txw430038b0_nv3041a_01_panel.h"
 #include "txw430038b0_nv3041a_01_spi.h"
 #if TXW430038B0_LCD_BUS_MODE == TXW430038B0_LCD_BUS_MODE_QSPI2
-#include "qspi2_lcd_bus.h"
+#include "qspi2_lcd_bus_priv.h"
 #else
 #include "spi_lcd_bus.h"
 #endif
@@ -297,7 +298,6 @@ static void lcd_run_bmp_test(void)
   UART3_Printf("LCD: bmp draw_ms=%lu\r\n", (unsigned long)draw_ms);
 }
 
-
 /* add user code end 0 */
 
 /**
@@ -337,7 +337,7 @@ int main(void)
                         (uint32_t)&SPI1->dt,
                         DMA1_CHANNEL1_MEMORY_BASE_ADDR,
                         DMA1_CHANNEL1_BUFFER_SIZE);
-  dma_channel_enable(DMA1_CHANNEL1, FALSE);
+  dma_channel_enable(DMA1_CHANNEL1, TRUE);
 
   /* init edma stream1 */
   wk_edma_stream1_init();
@@ -350,6 +350,11 @@ int main(void)
                         EDMA_STREAM1_BUFFER_SIZE);
   /* enable stream */
   edma_stream_enable(EDMA_STREAM1, TRUE);
+
+  /* init edma stream2 */
+  wk_edma_stream2_init();
+  /* QSPI2 LCD updates configure EDMA_STREAM2 dynamically per transfer. */
+  edma_stream_enable(EDMA_STREAM2, FALSE);
 
   /* init usart1 function. */
   wk_usart1_init();
@@ -379,7 +384,6 @@ int main(void)
   wk_exint_config();
 
   /* add user code begin 2 */
-  unsigned char id[8];
   int i;
 
   UART3_Printf("\x1b[2J\x1b[H");
@@ -394,8 +398,7 @@ int main(void)
 
     if(!ran)
     {
-#if 0
-      int ok;
+#if 1
       unsigned char *write_buf;
       volatile unsigned char *psram = (volatile unsigned char *)APS6404L_MEM_BASE;
       unsigned int addr;
@@ -410,106 +413,8 @@ int main(void)
       unsigned char used_malloc = 0;
       static unsigned char write_buf_fallback[APS6404L_TEST_CHUNK_SIZE];
 
-      for(i = 0; i < (int)sizeof(id); i++)
-      {
-        id[i] = 0;
-      }
-
       PSRAM_Reset();
-      ok = PSRAM_ReadID(id, (int)sizeof(id));
-
-      UART3_Printf("APS RDID:");
-      for(i = 0; i < (int)sizeof(id); i++)
-      {
-        UART3_PrintHexByte(id[i]);
-      }
-      UART3_Printf("\r\n");
-
-      if(ok)
-      {
-        unsigned char all_ff = 1;
-        for(i = 0; i < (int)sizeof(id); i++)
-        {
-          if(id[i] != 0xFF)
-          {
-            all_ff = 0;
-            break;
-          }
-        }
-        if(all_ff)
-        {
-          ok = 0;
-        }
-      }
-
-      if(!ok)
-      {
-        UART3_Printf("APS RDID: FAIL\r\n");
-      }
-
-      {
-        unsigned char qpi_w[32];
-        unsigned char qpi_r[32];
-        unsigned char qpi_pass = 1;
-        unsigned char qpi_fail_index = 0;
-
-        for(i = 0; i < (int)sizeof(qpi_w); i++)
-        {
-          qpi_w[i] = (unsigned char)(0xA0 + i);
-          qpi_r[i] = 0;
-        }
-
-        UART3_Printf("APS QPI FAST: START\r\n");
-        if(!PSRAM_EnterQuadMode())
-        {
-          UART3_Printf("APS QPI FAST: ENTER FAIL\r\n");
-        }
-        else
-        {
-          if(!PSRAM_QPI_FastWrite(0, qpi_w, (int)sizeof(qpi_w)))
-          {
-            UART3_Printf("APS QPI FAST: W FAIL\r\n");
-          }
-          else if(!PSRAM_QPI_FastRead(0, qpi_r, (int)sizeof(qpi_r)))
-          {
-            UART3_Printf("APS QPI FAST: R FAIL\r\n");
-          }
-          else
-          {
-            for(i = 0; i < (int)sizeof(qpi_w); i++)
-            {
-              if(qpi_w[i] != qpi_r[i])
-              {
-                qpi_pass = 0;
-                qpi_fail_index = (unsigned char)i;
-                break;
-              }
-            }
-
-            if(qpi_pass)
-            {
-              UART3_Printf("APS QPI FAST: OK\r\n");
-            }
-            else
-            {
-              UART3_Printf("APS QPI FAST: FAIL idx=");
-              UART3_PrintHexByte(qpi_fail_index);
-              UART3_Printf(" exp=");
-              UART3_PrintHexByte(qpi_w[qpi_fail_index]);
-              UART3_Printf(" got=");
-              UART3_PrintHexByte(qpi_r[qpi_fail_index]);
-              UART3_Printf("\r\n");
-            }
-          }
-
-          if(!PSRAM_ExitQuadMode())
-          {
-            UART3_Printf("APS QPI FAST: EXIT FAIL\r\n");
-          }
-        }
-      }
-
-      PSRAM_Reset();
+      UART3_Printf("APS TEST: mode=EDMA+XIP\r\n");
 
       {
         static uint32_t bench_w_u32[APS6404L_BENCH_CHUNK_BYTES / 4U];
@@ -536,113 +441,6 @@ int main(void)
         UART3_Printf(" chunk=");
         UART3_PrintHexU32(APS6404L_BENCH_CHUNK_BYTES);
         UART3_Printf("\r\n");
-
-        t0 = aps_perf_cycles();
-        for(off = 0; off < APS6404L_BENCH_TOTAL_BYTES; off += APS6404L_BENCH_CHUNK_BYTES)
-        {
-          if(!PSRAM_QPI_Write(base + off, bench_w, (int)APS6404L_BENCH_CHUNK_BYTES))
-          {
-            bench_ok = 0;
-            break;
-          }
-        }
-        t1 = aps_perf_cycles();
-        if(bench_ok)
-        {
-          aps_print_speed("APS BENCH WR 111", APS6404L_BENCH_TOTAL_BYTES, t1 - t0);
-        }
-        else
-        {
-          UART3_Printf("APS BENCH WR 111: FAIL\r\n");
-        }
-
-        sum = 0;
-        bench_ok = 1;
-        t0 = aps_perf_cycles();
-        for(off = 0; off < APS6404L_BENCH_TOTAL_BYTES; off += APS6404L_BENCH_CHUNK_BYTES)
-        {
-          if(!PSRAM_QPI_Read(base + off, bench_r, (int)APS6404L_BENCH_CHUNK_BYTES))
-          {
-            bench_ok = 0;
-            break;
-          }
-          for(i = 0; i < 16; i++)
-          {
-            sum ^= (uint32_t)bench_r[i];
-          }
-        }
-        t1 = aps_perf_cycles();
-        if(bench_ok)
-        {
-          aps_print_speed("APS BENCH RD 111", APS6404L_BENCH_TOTAL_BYTES, t1 - t0);
-          UART3_Printf("APS BENCH RD 111: sum=");
-          UART3_PrintHexU32(sum);
-          UART3_Printf("\r\n");
-        }
-        else
-        {
-          UART3_Printf("APS BENCH RD 111: FAIL\r\n");
-        }
-
-        if(PSRAM_EnterQuadMode())
-        {
-          bench_ok = 1;
-          t0 = aps_perf_cycles();
-          for(off = 0; off < APS6404L_BENCH_TOTAL_BYTES; off += APS6404L_BENCH_CHUNK_BYTES)
-          {
-            if(!PSRAM_QPI_FastWrite(base + off, bench_w, (int)APS6404L_BENCH_CHUNK_BYTES))
-            {
-              bench_ok = 0;
-              break;
-            }
-          }
-          t1 = aps_perf_cycles();
-          if(bench_ok)
-          {
-            aps_print_speed("APS BENCH WR 444", APS6404L_BENCH_TOTAL_BYTES, t1 - t0);
-          }
-          else
-          {
-          UART3_Printf("APS BENCH WR 444: FAIL\r\n");
-          }
-
-          sum = 0;
-          bench_ok = 1;
-          t0 = aps_perf_cycles();
-          for(off = 0; off < APS6404L_BENCH_TOTAL_BYTES; off += APS6404L_BENCH_CHUNK_BYTES)
-          {
-            if(!PSRAM_QPI_FastRead(base + off, bench_r, (int)APS6404L_BENCH_CHUNK_BYTES))
-            {
-              bench_ok = 0;
-              break;
-            }
-            for(i = 0; i < 16; i++)
-            {
-              sum ^= (uint32_t)bench_r[i];
-            }
-          }
-          t1 = aps_perf_cycles();
-          if(bench_ok)
-          {
-            aps_print_speed("APS BENCH RD 444", APS6404L_BENCH_TOTAL_BYTES, t1 - t0);
-            UART3_Printf("APS BENCH RD 444: sum=");
-            UART3_PrintHexU32(sum);
-            UART3_Printf("\r\n");
-          }
-          else
-          {
-          UART3_Printf("APS BENCH RD 444: FAIL\r\n");
-          }
-
-          if(!PSRAM_ExitQuadMode())
-          {
-            UART3_Printf("APS BENCH: EXIT QPI FAIL\r\n");
-          }
-        }
-        else
-        {
-          UART3_Printf("APS BENCH: ENTER QPI FAIL\r\n");
-        }
 
         bench_ok = 1;
         t0 = aps_perf_cycles();
@@ -873,7 +671,7 @@ int main(void)
             UART3_Printf("LCD: bars RED GREEN BLUE WHITE BLACK shown\r\n");
           }
 
-          lcd_run_bmp_test();
+        //   lcd_run_bmp_test();
           lcd_uart_fill_loop();
         }
       }

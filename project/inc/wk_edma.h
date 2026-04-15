@@ -60,6 +60,9 @@ extern "C" {
   /* init edma stream1 */
   void wk_edma_stream1_init(void);
 
+  /* init edma stream2*/
+  void wk_edma_stream2_init(void);
+
   /* config dma stream transfer parameter */
   /* user need to modify parameters memory0_base_addr and buffer_size */
   void wk_edma_stream_config(edma_stream_type* edma_streamx, uint32_t peripheral_base_addr, uint32_t memory0_base_addr, uint16_t buffer_size);

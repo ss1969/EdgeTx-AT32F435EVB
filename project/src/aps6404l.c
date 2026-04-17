@@ -7,24 +7,6 @@
 static uint8_t aps6404l_edma_inited = 0;
 
 /**
-  * @brief  Wait for command completion flag without clearing it.
-  * @param  qspi_x: QSPI peripheral instance.
-  * @param  timeout: loop counter timeout.
-  * @retval 1 on success, 0 on timeout.
-  */
-static int qspi_wait_cmd_flag(qspi_type *qspi_x, uint32_t timeout)
-{
-  while(qspi_flag_get(qspi_x, QSPI_CMDSTS_FLAG) == RESET)
-  {
-    if(timeout-- == 0)
-    {
-      return 0;
-    }
-  }
-  return 1;
-}
-
-/**
   * @brief  Wait for command completion flag and clear it.
   * @param  qspi_x: QSPI peripheral instance.
   * @param  timeout: loop counter timeout.
@@ -155,6 +137,11 @@ static void aps_edma_init_once(void)
   aps6404l_edma_inited = 1;
 }
 
+/**
+  * @brief  Configure the shared QSPI1 EDMA stream for either TX or RX.
+  * @param  direction: EDMA transfer direction for stream1.
+  * @retval none.
+  */
 static void aps_edma_config_stream1(edma_dir_type direction)
 {
   edma_init_type edma_init_struct;
@@ -263,10 +250,7 @@ int PSRAM_ReadID(unsigned char *pBuffer, int nLength)
 {
   int i;
   qspi_cmd_type cmd;
-  uint8_t value;
-  volatile uint32_t delay;
   uint32_t total_len;
-  uint32_t wait;
 
   if(nLength <= 0)
   {
@@ -289,14 +273,16 @@ int PSRAM_ReadID(unsigned char *pBuffer, int nLength)
   cmd.data_counter = total_len;
   cmd.second_dummy_cycle_num = 0;
   cmd.operation_mode = QSPI_OPERATE_MODE_111;
-  cmd.read_status_config = QSPI_RSTSC_SW_ONCE;
-  cmd.read_status_enable = TRUE;
+  cmd.read_status_config = QSPI_RSTSC_HW_AUTO;
+  cmd.read_status_enable = FALSE;
   cmd.write_data_enable = FALSE;
 
   qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
   qspi_cmd_operation_kick(QSPI1, &cmd);
 
-  if(!qspi_wait_cmd_flag(QSPI1, APS6404L_HW_TIMEOUT))
+  /* Small ID reads stay below the configured RX FIFO ready threshold, so wait
+     for the command to finish and then drain the bytes directly. */
+  if(!qspi_wait_cmd_done(QSPI1, APS6404L_HW_TIMEOUT))
   {
     aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
     return 0;
@@ -304,31 +290,23 @@ int PSRAM_ReadID(unsigned char *pBuffer, int nLength)
 
   for(i = 0; i < (int)total_len; i++)
   {
-    wait = 256;
-    while(qspi_flag_get(QSPI1, QSPI_RXFIFORDY_FLAG) == RESET)
-    {
-      if(wait-- == 0)
-      {
-        break;
-      }
-    }
-    delay = 16;
-    while(delay--)
-    {
-      __NOP();
-    }
-    value = qspi_byte_read(QSPI1);
     if((unsigned int)i >= 3U)
     {
       unsigned int out_index = (unsigned int)i - 3U;
       if(out_index < (unsigned int)nLength)
       {
-        pBuffer[out_index] = (unsigned char)value;
+        pBuffer[out_index] = (unsigned char)qspi_byte_read(QSPI1);
+      }
+      else
+      {
+        (void)qspi_byte_read(QSPI1);
       }
     }
+    else
+    {
+      (void)qspi_byte_read(QSPI1);
+    }
   }
-
-  qspi_flag_clear(QSPI1, QSPI_CMDSTS_FLAG);
 
   aps_qspi_xip_enable(TRUE, APS6404L_HW_TIMEOUT);
   return 1;
